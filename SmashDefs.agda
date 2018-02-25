@@ -188,6 +188,11 @@ ap□-idp : ∀ {i} {A B : Type i} (f : A → B)
       → Cube (ap□ (λ x → idp {a = f x}) p) (& vids (ap f p)) ids ids (& hids (ap f p)) (& hids (ap f p))
 ap□-idp f idp = idc
 
+ap++ : ∀ {i} {A B : Type i} {a b c d : A → B} {p : (x : A) → a x == b x} {q : (x : A) → c x == d x} {r : (x : A) → a x == c x} {s : (x : A) → b x == d x} (α : (x : A) → Square (p x) (q x) (r x) (s x))
+      {x y : A} (k : x == y)
+      → Cube (α x) (α y) (ap□ p k) (ap□ q k) (ap□ r k) (ap□ s k)
+ap++ α idp = & hidc
+
 ap-square : ∀ {i} {A B : Type i} (f : A → B)
   {a b c d : A} {p : a == b} {q : c == d} {r : a == c} {s : b == d}
   → Square p q r s
@@ -281,6 +286,15 @@ postulate
                   (ap-∘ f a p)
                   (ap-∘ f b p)
 
+  ap□-∘3 : ∀ {i} {X A B C : Type i} (f : B → C) {a b : A → B} (g : (x : A) → a x == b x) (h : X → A)
+           {y z : X} (p : y == z)
+           → Cube (ap□ (λ x → ap f (g (h x))) p)
+                  (ap□ (λ x → ap f (g x)) (ap h p))
+                  (& hids (ap f (g (h y))))
+                  (& hids (ap f (g (h z))))
+                  (ap-∘ (λ x → f (a x)) h p)
+                  (ap-∘ (λ x → f (b x)) h p)
+
   ap□-∘-idf : ∀ {i} {A B : Type i} {a b : A → B} (g : (x : A) → a x == b x)
          {y z : A} (p : y == z)
          → Cube (ap□ (λ y → ap (λ x → x) (g y)) p)
@@ -294,7 +308,7 @@ postulate
            {y z : A} (p : y == z)
            → Cube (ap□ (λ x → f (g x)) p) (ap□ f (ap g p)) (& hids (f (g y))) (& hids (f (g z))) (ap-∘ a g p) (ap-∘ b g p)
 
-  ap□-new : ∀ {i} {A B : Type i} {a b : A → B} {f g : (x : A) → a x == b x} (α : (x : A) → Square (f x) (g x) idp idp)
+  ap□-= : ∀ {i} {A B : Type i} {a b : A → B} {f g : (x : A) → a x == b x} (α : (x : A) → Square (f x) (g x) idp idp)
             {x y : A} (p : x == y)
           → Cube (ap□ f p) (ap□ g p) (α x) (α y) (& hids (ap a p)) (& hids (ap b p))
 
@@ -339,6 +353,29 @@ apdegen! = path-induction
   → PathOver (λ x → Square (p x) (q x) (r x) (s x)) α u v
 ↓-Square-in {α = idp} c = & antidegen-cube c
 
+↓-Cube-in : ∀ {i} {A B : Type i}
+  {a b c d : A → B}
+  {p : (x : A) → a x == b x} {q : (x : A) → c x == d x}
+  {r : (x : A) → a x == c x} {s : (x : A) → b x == d x}
+  {sq : (x : A) → Square (p x) (q x) (r x) (s x)}
+  {a' b' c' d' : A → B}
+  {p' : (x : A) → a' x == b' x} {q' : (x : A) → c' x == d' x}
+  {r' : (x : A) → a' x == c' x} {s' : (x : A) → b' x == d' x}
+  {sq' : (x : A) → Square (p' x) (q' x) (r' x) (s' x)}
+  {a= : (x : A) → a x == a' x}
+  {b= : (x : A) → b x == b' x}
+  {c= : (x : A) → c x == c' x}
+  {d= : (x : A) → d x == d' x}
+  {p= : (x : A) → Square (p x) (p' x) (a= x) (b= x)}
+  {q= : (x : A) → Square (q x) (q' x) (c= x) (d= x)}
+  {r= : (x : A) → Square (r x) (r' x) (a= x) (c= x)}
+  {s= : (x : A) → Square (s x) (s' x) (b= x) (d= x)}
+  {y z : A} {α : y == z}
+  {u : Cube (sq y) (sq' y) (p= y) (q= y) (r= y) (s= y)}
+  {v : Cube (sq z) (sq' z) (p= z) (q= z) (r= z) (s= z)}
+  → HyperCube u v (ap++ sq α) (ap++ sq' α) (ap++ p= α) (ap++ q= α) (ap++ r= α) (ap++ s= α)
+  → PathOver (λ x → Cube (sq x) (sq' x) (p= x) (q= x) (r= x) (s= x)) α u v
+↓-Cube-in {α = idp} c = {!!}
 
 
 module _ {i} {A B : Type i} {{_ : Pointed A}} {{_ : Pointed B}} where

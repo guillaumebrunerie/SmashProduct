@@ -670,6 +670,8 @@ pattern ap-∘-cst2 c f p = App (App (App (Atom "ap-∘-cst2") c) f) p
 pattern ap-∘3-cst f c h p = App (App (App (App (Atom "ap-∘3-cst") f) c) h) p
 pattern ap□-idp f p = App (App (Atom "ap□-idp") f) p
 pattern ap□+ f sq = App (App (Atom "ap□+") f) sq
+pattern ap□-= α p = App (App (Atom "ap□-=") α) p
+pattern ap□-∘3 f g h p = App (App (App (App (Atom "ap□-∘3") f) g) h) p
 
 pattern axiom term type = AppI term (App (Atom "axiom") type)
 
@@ -747,6 +749,14 @@ eta-expand f =
   let x = fresh [ f ] "x" in
   Lam x X (AppReduce f (Var x X))
 
+eta-contract : Term → Term
+eta-contract t@(Lam x X (App f (Var y Y))) =
+  if (x ==ₛ y) ∧ (X ==ₜ Y) then
+    eta-contract f
+  else
+    t
+eta-contract t = t
+
 apply-path-single : Declaration → List Term → Term → Term
 
 glue-β-name : LR → String
@@ -793,7 +803,7 @@ get-type (ap-squareᵖ f sq) with get-type sq
 get-type (ap□ᵖ k p) with get-type k | get-type p
 ... | Pi x A (Id f g) | Id a b =
   if get-type a ==ₜ A then
-    Square (AppReduce k a) (AppReduce k b) (ap (Lam x A f) p) (ap (Lam x A g) p)
+    Square (AppReduce k a) (AppReduce k b) (ap (eta-contract (Lam x A f)) p) (ap (eta-contract (Lam x A g)) p)
   else
     Error ("ap□ error " ++ print-P k  ++ " / " ++ print-P p ++ " / " ++ print-P (mhs (get-type p)) ++ " / " ++ print-P (get-domain (get-type k)))
 ... | _ | _ = Error ("get-type ap□ " ++ print-P k ++ " / " ++ print-P p)
@@ -846,25 +856,25 @@ get-type (ap-∘3 f g h p) =
 
 
 get-type (ap□-∘-eq (Lam var Z g) f p (Lam v2 T eq)) =
-  let a = Lam var Z (lhs (get-type g)) in
-  let b = Lam var Z (rhs (get-type g)) in
+  let a = eta-contract (Lam var Z (lhs (get-type g))) in
+  let b = eta-contract (Lam var Z (rhs (get-type g))) in
   let y = lhs (get-type p) in
   let z = rhs (get-type p) in
-  let res = Lam v2 T (second-side (get-type eq)) in
+  let res = eta-contract (Lam v2 T (second-side (get-type eq))) in
   Cube (ap□ res p)
-       (ap-square f (ap□ (Lam var Z g) p))
+       (ap-square f (ap□ (eta-contract (Lam var Z g)) p))
        (hinv (eq [ y / v2 ]))
        (hinv (eq [ z / v2 ]))
        (ap-∘ f a p)
        (ap-∘ f b p)
 
 get-type (ap□-∘-idf (Lam var Z g) p) =
-  let a = Lam var Z (lhs (get-type g)) in
-  let b = Lam var Z (rhs (get-type g)) in
+  let a = eta-contract (Lam var Z (lhs (get-type g))) in
+  let b = eta-contract (Lam var Z (rhs (get-type g))) in
   let y = lhs (get-type p) in
   let z = rhs (get-type p) in
-  Cube (ap□ (Lam var Z (ap (idf (mhs (get-type g))) g)) p)
-       (ap□ (Lam var Z g) p)
+  Cube (ap□ (eta-contract (Lam var Z (ap (idf (mhs (get-type g))) g))) p)
+       (ap□ (eta-contract (Lam var Z g)) p)
        (ap-idf (g [ y / var ]))
        (ap-idf (g [ z / var ]))
        (hids (ap a p))
@@ -873,8 +883,8 @@ get-type (ap□-∘-idf (Lam var Z g) p) =
 get-type (ap□-∘2 f@(Lam var Z f-inner) g p) =
   let y = lhs (get-type p) in
   let z = rhs (get-type p) in
-  let a = Lam var Z (lhs (get-type f-inner)) in
-  let b = Lam var Z (rhs (get-type f-inner)) in
+  let a = eta-contract (Lam var Z (lhs (get-type f-inner))) in
+  let b = eta-contract (Lam var Z (rhs (get-type f-inner))) in
   Cube (ap□ (f ∘ g) p) (ap□ f (ap g p)) (hids (AppReduce f (AppReduce g y))) (hids (AppReduce f (AppReduce g z))) (ap-∘ a g p) (ap-∘ b g p)
 
 get-type (ap-cube f cu) with get-type cu
@@ -910,9 +920,26 @@ get-type (ap□+ α@(Lam x X α-in) sq) =
   let q = second-side (get-type sq) in
   let r = third-side (get-type sq) in
   let s = fourth-side (get-type sq) in
-  let f = Lam x X (lhs (get-type α-in)) in
-  let g = Lam x X (rhs (get-type α-in)) in
+  let f = eta-contract (Lam x X (lhs (get-type α-in))) in
+  let g = eta-contract (Lam x X (rhs (get-type α-in))) in
   Cube (ap□ α p) (ap□ α q) (ap□ α r) (ap□ α s) (ap-square f sq) (ap-square g sq)
+
+get-type t@(ap□-= α p) with get-type α | get-type p
+... | Pi x X (Square f g (Idp _) (Idp _)) | Id y z =
+  Cube (ap□ (eta-contract (Lam x X f)) p) (ap□ (Lam x X g) p) (AppReduce α y) (AppReduce α z) (hids (ap (Lam x X (lhs (get-type f))) p)) (hids (ap (Lam x X (rhs (get-type f))) p))
+... | _ | _ = Error ("get-type ap□-= " ++ print t)
+
+get-type t@(ap□-∘3 f g h p) with get-type g | get-type p
+... | Pi x A (Id a b) | Id y z =
+  let X = get-domain (get-type h) in
+  let v = fresh (f ∷ g ∷ h ∷ []) "x" in
+  Cube (ap□ (Lam v X (ap f (AppReduce g (AppReduce h (Var v X))))) p)
+       (ap□ (Lam v A (ap f (AppReduce g (Var v A)))) (ap (eta-contract h) p))
+       (hids (ap f (AppReduce g (AppReduce h y))))
+       (hids (ap f (AppReduce g (AppReduce h z))))
+       (ap-∘ (f ∘ (eta-contract (Lam x A a))) h p)
+       (ap-∘ (f ∘ (eta-contract (Lam x A b))) h p)
+... | _ | _ = Error ("get-type ap□-∘3 " ++ print t)
 
 get-type (axiom term type) = type
 
@@ -1286,7 +1313,7 @@ extend-CC-aux ctx t@(apᵖ f p) with split f | p
 ... | Cst k | Glue _ _ _ _ =
   extend-CC-with (ap f p) (ap-cst k p) ctx
 
-... | Projpt lr A B | _ =
+... | Projpt lr A B | Glue _ _ _ _ =
   extend-CC-with (ap f p) (ap□ (glue A B lr) p) ctx
 
 ... | SingleDec dec args | Glue lr A B ab =
@@ -1300,6 +1327,9 @@ extend-CC-aux ctx t@(apᵖ f p) with split f | p
 ...   | SingleDec dec args | Glue lr A B ab =
   extend-CC-with (ap f p) (ap-square f (glue-β dec args lr A B ab)) ctx
 
+...   | Cst k | Glue _ _ _ _ =
+  extend-CC-with (ap f p) (ap-square f (ap-cst k q)) ctx
+
 ...   | _ | _ =
   extend-CC-with (ap f p) (ap-∘ f g q) ctx
 
@@ -1310,23 +1340,69 @@ extend-CC-aux ctx t@(apᵖ f p) | _ | _ =
   else
     trerror ("extend-CC 0 " ++ print (ap f p)) ctx
 
+extend-CC-aux ctx t@(ap□ᵖ h@(Lam x X (apᵖ f p)) (apᵖ g q)) with split g | q
 
--- extend-CC-aux ctx (ap□ ff@(Lam x X (apᵖ (Lam _ _ (Var _ _)) g)) p@(Glue lr _ _ _)) =
---   extend-CC-with (ap□ ff p) (ap□-∘-idf (Lam x X g) p) ctx
+... | SingleDec dec args | Glue lr A B u =
+  extend-CC-with t (ap□+ h (glue-β dec args lr A B u)) ctx
 
-{- Initial thing -}
-extend-CC-aux ctx (ap□ᵖ ff@(Lam x X (apᵖ f g)) p@(Glue _ _ _ _)) =
-  extend-CC-with (ap□ ff p) (ap□-∘-eq (Lam x X g) f p (Lam x X (hids (ap f g)))) ctx
+... | _ | _ =
+  trerror ("TODO Y " ++ print t) ctx
+
+extend-CC-aux ctx t@(ap□ᵖ (Lam x X (apᵖ f p)) q) with split f | p
+
+... | Idf | Glue _ _ _ _ =
+  extend-CC-with t (ap□-= (Lam x X (ap-idf p)) q) ctx
+
+... | Cst k | Glue _ _ _ _ =
+  extend-CC-with t (ap□-= (Lam x X (ap-cst k p)) q) ctx
+
+... | SingleDec dec args | Glue lr A B ab =
+  extend-CC-with t (ap□-= (Lam x X (glue-β dec args lr A B ab)) q) ctx
+
+... | InnerDec dec args g | Glue _ _ _ _ =
+  extend-CC-with t (ap□-= (Lam x X (ap-∘ g (Dec dec args) p)) q) ctx
+
+... | _ | apᵖ g r with split g | r
+
+...   | SingleDec dec args | Glue lr A B ab =
+  extend-CC-with t (ap□-= (Lam x X (ap-square f (glue-β dec args lr A B ab))) q) ctx
+
+...   | Cst k | Glue _ _ _ _ =
+  extend-CC-with t (ap□-= (Lam x X (ap-cst k r)) q) ctx
+
+...   | _ | _ =
+  extend-CC-with t (ap□-= (Lam x X (ap-∘ f g r)) q) ctx
+
+extend-CC-aux ctx t@(ap□ᵖ h@(Lam x X (apᵖ f p)) q) | _ | _ with split (Lam x X p) | q
+
+...   | Cst k | Glue _ _ _ _ =
+  extend-CC-with t (ap□-cst (ap f p) q) ctx
+
+...   | SingleDec dec args | Glue _ _ _ _ =
+  extend-CC-with t (ap□-∘-eq (eta-expand (Dec dec args)) f q (Lam x X (hids (ap f p)))) ctx
+
+...   | InnerDec dec args rest | Glue _ _ _ _ =
+  extend-CC-with t (ap□-∘3 f rest (Dec dec args) q) ctx
+
+...   | SCoh _ _ s ty args | Glue _ _ _ _ =
+  extend-CC-with t (ap□-= (Lam x X (apcohify s ty args f)) q) ctx
+
+...   | _ | _ =
+  let Appp s ty args = unapp q in
+  if isCoh s then
+    extend-CC-with t (ap□cohify s ty args h) ctx
+  else
+    trerror ("extend-CC 00 " ++ print t) ctx
 
 extend-CC-aux ctx t@(ap□ᵖ f p) with split f | p
-... | Cst k | _ =
+... | Cst k | Glue _ _ _ _ =
   extend-CC-with (ap□ f p) (ap□-cst k p) ctx
 
 ... | SingleDec dec args | Glue lr A B u =
   extend-CC-with (ap□ f p) (glue-β□ dec args lr A B u) ctx
 
 ... | InnerDec dec args rest | Glue _ _ _ _ =
-  extend-CC-with t (ap□-∘2 rest (Dec dec args) p) ctx
+  extend-CC-with t (ap□-∘2 rest (eta-expand (Dec dec args)) p) ctx
 
 ... | SCoh x X s ty args | _ =
   extend-CC-with (ap□ f p) (ap/cohify s ty p x X args) ctx
@@ -1337,44 +1413,65 @@ extend-CC-aux ctx t@(ap□ᵖ f p) with split f | p
 ... | _ | apᵖ (Dec dec args) (Glue lr A B u) =
   extend-CC-with t (ap□+ f (glue-β dec args lr A B u)) ctx
 
+... | _ | apᵖ (Lam _ _ (App (Dec dec args) (Var _ _))) (Glue lr A B u) =
+  extend-CC-with t (ap□+ f (glue-β dec args lr A B u)) ctx
+
 ... | _ | _ =
-  trerror ("extend-CC 6 " ++ print t) ctx
+  let Appp s ty args = unapp p in
+  if isCoh s then
+    extend-CC-with t (ap□cohify s ty args f) ctx
+  else
+    trerror ("extend-CC 6 " ++ print t) ctx
 
-extend-CC-aux ctx (ap-idf (apᵖ g p)) =
-     extend-CC-with (ap-idf (ap g p)) (ap-∘-idfl g p) ctx
-
-extend-CC-aux ctx t@(ap-∘ᵖ f g p) with split f | p
+extend-CC-aux ctx t@(ap-∘ᵖ f g p) with split f | split g
 -- -- ... | Idf | _ =
 -- --        extend-CC-with (ap-∘ f g p) (ap-∘-idfl g p) ctx
 
-... | Cst c | _ =
-       extend-CC-with (ap-∘ f g p) (ap-∘-cst2 c g p) ctx
+... | _ | Cst b =
+       extend-CC-with (ap-∘ f g p) (ap-∘-cst f b p) ctx
 
--- {- Debatable -}
--- ... | _ | apᵖ h q =
---   extend-CC-with (ap-∘ f g p) (ap-∘3 f g h q) ctx
+-- ... | Cst a | _ =
+--        extend-CC-with (ap-∘ f g p) (ap-∘-cst2 a g p) ctx
+
+-- -- {- Debatable -}
+-- -- ... | _ | apᵖ h q =
+-- --   extend-CC-with (ap-∘ f g p) (ap-∘3 f g h q) ctx
 
 ... | _ | _ =
   trerror ("extend-CC 23 " ++ print t) ctx
 
--- extend-CC-aux ctx t@(ap-squareᵖ f (ap□ g@(Lam x X (apᵖ h q)) p@(Glue lr _ _ _))) =
---   extend-CC-with t (ap-cube f (ap□-∘-eq (Lam x X q) h p (Lam x X (hids (ap h q))))) ctx
+-- -- extend-CC-aux ctx t@(ap-squareᵖ f (ap□ g@(Lam x X (apᵖ h q)) p@(Glue lr _ _ _))) =
+-- --   extend-CC-with t (ap-cube f (ap□-∘-eq (Lam x X q) h p (Lam x X (hids (ap h q))))) ctx
 
-{- Debatable -}
+-- {- Debatable -}
 -- extend-CC-aux ctx (ap-cst k (apᵖ f p)) =
---   extend-CC-with
+  
+
+extend-CC-aux ctx t@(ap-squareᵖ f (ap-∘ᵖ g h p)) with split g | split h
+
+... | _ | Cst b =
+  extend-CC-with t (ap-cube f (ap-∘-cst g b p)) ctx
+
+... | Cst a | _ =
+  extend-CC-with t (ap-cube f (ap-∘-cst2 a h p)) ctx
+
+... | _ | _ =
+  extend-CC-with t (ap-∘3 f g h p) ctx
 
 extend-CC-aux ctx t@(ap-squareᵖ f sq) with split f | sq
 
-{- Debatable -}
-... | _ | ap-cst b p =
-  extend-CC-with (ap-square f sq) (ap-∘-cst f b p) ctx
+... | _ | ap□ᵖ (Dec dec args) (Glue lr A B u) =
+  extend-CC-with t (ap-cube f (glue-β□ dec args lr A B u)) ctx
 
-... | Cst _ | _ =
-  trerror ("TODO5 " ++ print t) ctx
+-- {- Debatable -}
+-- ... | _ | ap-cst b p =
+--   extend-CC-with (ap-square f sq) (ap-∘-cst f b p) ctx
 
-... | Idf | _ =
-  extend-CC-with (ap-square f sq) (ap-square-idf sq) ctx
+-- ... | Cst _ | _ =
+--   trerror ("TODO5 " ++ print t) ctx
+
+-- ... | Idf | _ =
+--   extend-CC-with (ap-square f sq) (ap-square-idf sq) ctx
 
 ... | SingleDec dec args | ap□ᵖ g@(Lam x X (Glue lr A B u)) p =
   extend-CC-with (ap-square f sq) (ap□-∘-eq g (Dec dec args) p (Lam x X (glue-β dec args lr A B u))) ctx
@@ -1382,73 +1479,84 @@ extend-CC-aux ctx t@(ap-squareᵖ f sq) with split f | sq
 ... | InnerDec dec args rest | ap□ᵖ (Lam _ _ (Glue _ _ _ _)) p =
   extend-CC-with (ap-square f sq) (ap-square-∘ rest (Dec dec args) sq) ctx
 
-extend-CC-aux ctx t@(ap-squareᵖ f sq)
-    | _ | ap-squareᵖ g sq' with split g | sq'
+... | _ | ap□ᵖ g (apᵖ (Dec dec args) (Glue lr A B u)) =
+  extend-CC-with t (ap-cube f (ap□+ (eta-expand g) (glue-β dec args lr A B u))) ctx
+
+... | _ | ap-squareᵖ (Dec dec args) (ap□ᵖ g@(Lam x X (Glue lr A B u)) p) =
+  extend-CC-with t (ap-cube f (ap□-∘-eq g (Dec dec args) p (Lam x X (glue-β dec args lr A B u)))) ctx
+
+... | _ | ap□ᵖ g p =
+  let X = get-domain (get-type g) in
+  let x = fresh (X ∷ f ∷ g ∷ []) "x" in
+  extend-CC-with t (ap□-∘-eq g f p (Lam x X (hids (ap f (AppReduce g (Var x X)))))) ctx
+
+-- extend-CC-aux ctx t@(ap-squareᵖ f sq)
+--     | _ | ap-squareᵖ g sq' with split g | sq'
+
+-- -- {- Debatable -}
+-- -- ...   | _ | ap-cst b p =
+-- --   extend-CC-with (ap-square f sq) (ap-cube f (ap-∘-cst g b p)) ctx
+
+-- ...   | SingleDec dec args | ap□ᵖ h@(Lam x X (Glue lr A B u)) p =
+--   extend-CC-with (ap-square f sq) (ap-cube f (ap□-∘-eq h g p (Lam x X (glue-β dec args lr A B u)))) ctx
+
+-- -- ...     | SingleDec dec' args' | Glue lr A B ab =
+-- --   extend-CC-with (ap-square f sq) (ap-cube f (ap-cube g (glue-β□ dec' args' lr A B ab))) ctx
+
+-- -- ...     | SCoh x X s ty' args' | _ =
+
+-- -- extend-CC-aux ctx t@(ap-squareᵖ f sq) | _ | ap-squareᵖ g sq' | _ | ap-squareᵖ h sq'' with split h | sq''
+
+-- -- ...     | SingleDec dec args | ap□ k p with split k | p
+
+-- -- ...       | SGlue lr x X A B u | _ =
+-- --   extend-CC-with (ap-square f sq) (ap-cube f (ap-cube g (ap□-∘-eq k h p (Lam x X (glue-β dec args lr A B u))))) ctx
+
+-- -- ...       | _ | _ =
+-- --   trerror ("TODO7 " ++ print t) ctx
+
+-- -- extend-CC-aux ctx t@(ap-squareᵖ f sq) | _ | ap-squareᵖ g sq' | _ | ap-squareᵖ h sq'' | _ | _ =
+-- --   trerror ("TODO8 " ++ print t) ctx
+
+-- ...   | _ | _ =
+--   extend-CC-with (ap-square f sq) (ap-square-∘ f g sq') ctx
+--   -- let Appp s ty args = unapp sq' in
+--   -- if isCoh s then
+--   --   extend-CC-with (ap-square f sq) (ap-cube f (apcohify s ty args g)) ctx
+--   -- else
+--   --   trerror ("TODO9 " ++ print t) ctx
+
 
 -- {- Debatable -}
--- ...   | _ | ap-cst b p =
---   extend-CC-with (ap-square f sq) (ap-cube f (ap-∘-cst g b p)) ctx
+-- extend-CC-aux ctx t@(ap-squareᵖ f sq) | _ | ap-∘ᵖ g h p with split g
 
-...   | SingleDec dec args | ap□ᵖ h@(Lam x X (Glue lr A B u)) p =
-  extend-CC-with (ap-square f sq) (ap-cube f (ap□-∘-eq h g p (Lam x X (glue-β dec args lr A B u)))) ctx
+-- ...       | Cst c = extend-CC-with (ap-square f sq) (ap-∘3-cst f c h p) ctx
 
--- ...     | SingleDec dec' args' | Glue lr A B ab =
---   extend-CC-with (ap-square f sq) (ap-cube f (ap-cube g (glue-β□ dec' args' lr A B ab))) ctx
+-- ...       | _ = extend-CC-with (ap-square f sq) (ap-∘3 f g h p) ctx
 
--- ...     | SCoh x X s ty' args' | _ =
+-- extend-CC-aux ctx t@(ap-squareᵖ f sq) | _ | ap□ᵖ g p with split g | p
 
--- extend-CC-aux ctx t@(ap-squareᵖ f sq) | _ | ap-squareᵖ g sq' | _ | ap-squareᵖ h sq'' with split h | sq''
+-- ... | Cst k | _ =
+--   extend-CC-with t (ap-cube f (ap□-cst k p)) ctx
 
--- ...     | SingleDec dec args | ap□ k p with split k | p
+-- ... | SingleDec dec args | Glue lr A B u =
+--   extend-CC-with t (ap-cube f (glue-β□ dec args lr A B u)) ctx
 
--- ...       | SGlue lr x X A B u | _ =
---   extend-CC-with (ap-square f sq) (ap-cube f (ap-cube g (ap□-∘-eq k h p (Lam x X (glue-β dec args lr A B u))))) ctx
+-- ... | InnerDec dec args rest | Glue _ _ _ _ =
+--   extend-CC-with t (ap-cube f (ap□-∘2 rest (Dec dec args) p)) ctx
 
--- ...       | _ | _ =
---   trerror ("TODO7 " ++ print t) ctx
+-- ... | SCoh x X s ty args | _ =
+--   extend-CC-with t (ap□-∘-eq g f p (Lam x X (apcohify s ty args f))) ctx
 
--- extend-CC-aux ctx t@(ap-squareᵖ f sq) | _ | ap-squareᵖ g sq' | _ | ap-squareᵖ h sq'' | _ | _ =
---   trerror ("TODO8 " ++ print t) ctx
+-- ... | _ | apᵖ (Dec dec args) (Glue lr A B u) =
+--   extend-CC-with t (ap-cube f (ap□+ g (glue-β dec args lr A B u))) ctx
 
-...   | _ | _ =
-  extend-CC-with (ap-square f sq) (ap-square-∘ f g sq') ctx
-  -- let Appp s ty args = unapp sq' in
-  -- if isCoh s then
-  --   extend-CC-with (ap-square f sq) (ap-cube f (apcohify s ty args g)) ctx
-  -- else
-  --   trerror ("TODO9 " ++ print t) ctx
-
-
-{- Debatable -}
-extend-CC-aux ctx t@(ap-squareᵖ f sq) | _ | ap-∘ᵖ g h p with split g
-
-...       | Cst c = extend-CC-with (ap-square f sq) (ap-∘3-cst f c h p) ctx
-
-...       | _ = extend-CC-with (ap-square f sq) (ap-∘3 f g h p) ctx
-
-extend-CC-aux ctx t@(ap-squareᵖ f sq) | _ | ap□ᵖ g p with split g | p
-
-... | Cst k | _ =
-  extend-CC-with t (ap-cube f (ap□-cst k p)) ctx
-
-... | SingleDec dec args | Glue lr A B u =
-  extend-CC-with t (ap-cube f (glue-β□ dec args lr A B u)) ctx
-
-... | InnerDec dec args rest | Glue _ _ _ _ =
-  extend-CC-with t (ap-cube f (ap□-∘2 rest (Dec dec args) p)) ctx
-
-... | SCoh x X s ty args | _ =
-  extend-CC-with t (ap□-∘-eq g f p (Lam x X (apcohify s ty args f))) ctx
-
-... | _ | apᵖ (Dec dec args) (Glue lr A B u) =
-  extend-CC-with t (ap-cube f (ap□+ g (glue-β dec args lr A B u))) ctx
-
-... | _ | _ =
-  let Appp s ty args = unapp p in
-  if isCoh s then
-    extend-CC-with t (ap-cube f (ap□cohify s ty args g)) ctx 
-  else
-    trerror ("TODO X " ++ print t) ctx
+-- ... | _ | _ =
+--   let Appp s ty args = unapp p in
+--   if isCoh s then
+--     extend-CC-with t (ap-cube f (ap□cohify s ty args g)) ctx 
+--   else
+--     trerror ("TODO X " ++ print t) ctx
 
 extend-CC-aux ctx t@(ap-squareᵖ f sq) | _ | _ =
   let Appp s ty args = unapp sq in
@@ -1456,6 +1564,8 @@ extend-CC-aux ctx t@(ap-squareᵖ f sq) | _ | _ =
     extend-CC-with (ap-square f sq) (apcohify s ty args f) ctx
   else
     trerror ("extend-CC 8 " ++ print t) ctx
+
+-- extend-CC-aux ctx t@(ap-cst b (ap g p) q) =
 
 extend-CC-aux ctx t@(App f arg) =
   let Appp s ty args = unapp t in
