@@ -1,4 +1,4 @@
-{-# OPTIONS --without-K --type-in-type #-}
+{-# OPTIONS --without-K --type-in-type --caching #-}
 
 data ℕ : Set where
   O : ℕ
@@ -27,6 +27,7 @@ record Σ (A : Set) (B : A → Set) : Set where
   field
     fst : A
     snd : B fst
+open Σ public
 
 coe : {A B : Set} → (A == B) → A → B
 coe idp a = a
@@ -48,7 +49,7 @@ data Maybe (A : Set) : Set where
 
 data Context : Set
 data Type (Γ : Context) : Set
-data Term (Γ : Context) : (T : Type Γ) → Set
+data Term (Γ : Context) (T : Type Γ) : Set
 data vars : (Γ : Context) → Set
 get-type : (Γ : Context) → vars Γ → Type Γ
 
@@ -76,8 +77,8 @@ data Type Γ where
   * : Type Γ
   Id : {T : Type Γ} → Term Γ T → Term Γ T → Type Γ
 
-data Term Γ where
-  Var : (n : vars Γ) → Term Γ (get-type Γ n)
+data Term Γ T where
+  Var : (n : vars Γ) (eq : T == get-type Γ n) → Term Γ T
 
 weaken * = *
 weaken (Id u v) = Id (weaken-tm u) (weaken-tm v)
@@ -85,7 +86,7 @@ weaken (Id u v) = Id (weaken-tm u) (weaken-tm v)
 get-type (Γ , T) last = weaken T
 get-type (Γ , T) (before n) = weaken (get-type Γ n)
 
-weaken-tm (Var n) = Var (before n)
+weaken-tm (Var n idp) = Var (before n) idp
 
 {-# TERMINATING #-}
 [_]ctx : Context → Set
@@ -104,16 +105,25 @@ eq-weaken-tm : {Γ : Context} {T : Type Γ} {γ : [ Γ ]ctx} {t : Term Γ T} {U 
 eq-weaken {T = *} = idp
 eq-weaken {T = Id x y} = eq-PathOver (eq-weaken-tm {t = x}) (eq-weaken-tm {t = y})
 
-[ Var last ]tm (a , b) = coe eq-weaken b
-[ Var (before n) ]tm (a , b) = coe eq-weaken ([ Var n ]tm a)
+[ Var last idp ]tm (a , b) = coe eq-weaken b
+[ Var (before n) idp ]tm (a , b) = coe eq-weaken ([ Var n idp ]tm a)
 
-eq-weaken-tm {t = Var n} = PathOverCoe
+eq-weaken-tm {t = Var n idp} = PathOverCoe
 
 [[_]] : Coherence → Set
 [[ coh Γ U ]] = (γ : [ Γ ]ctx) → [ U ]ty γ
 
 test : Coherence
-test = coh (⟨⟩ , * , * , Id (Var (before last)) (Var last)) (Id (Var (before last)) (Var (before (before last))))
+test = coh (⟨⟩ , * , * , Id (Var (before last) idp) (Var last idp)) (Id (Var (before last) idp) (Var (before (before last)) idp))
+
+subst-ty : {Γ : Context} {U : Type Γ} (T : Type (Γ , U)) (a : Term Γ U) → Type Γ
+subst-tm : {Γ : Context} {U : Type Γ} {T : Type (Γ , U)} (u : Term (Γ , U) T) (a : Term Γ U) → Term Γ (subst-ty T a)
+
+subst-ty * a = *
+subst-ty (Id u v) a = Id (subst-tm u a) (subst-tm v a)
+
+subst-tm (Var last idp) a = {!a!}
+subst-tm (Var (before n) idp) a = Var {!n!} idp
 
 postulate
   inv : [[ test ]]
@@ -121,13 +131,31 @@ postulate
 paf : {a b : A} → a == b → b == a
 paf p = inv (_ , _ , _ , p)
 
-solve : (c : Coherence) → Maybe [[ c ]]
-solve (coh ⟨⟩ _) = nothing
-solve (coh (⟨⟩ , *) *) = just (λ {(_ , a) → a})
-solve (coh (⟨⟩ , *) (Id (Var last) x₁)) = {!x₁!}
-solve (coh (⟨⟩ , *) (Id (Var (before ())) _))
-solve (coh (⟨⟩ , Id (Var ()) _) T)
-solve (coh (Γ , T₂ , T₁) T) = {!!}
+thing : {Γ : Context} {T : Type Γ} {U : Type Γ} {T' : Type (Γ , U)} {γ : [ Γ ]ctx} {u : [ U ]ty γ} → (T' == weaken T) → [ T ]ty γ == [ T' ]ty (γ , u)
+thing idp = eq-weaken
+
+-- Here is the problem:
+-- In [lemma], the right-hand side of [eq'] depends on [a] (because we weaken by [a]), so we cannot use J on it
+
+solve : (Γ : Context) (T : Type Γ) → Maybe [[ coh Γ T ]]
+solve ⟨⟩ _ = nothing
+solve (⟨⟩ , *) * = just (λ γ → snd γ)
+solve (⟨⟩ , *) (Id (Var last idp) (Var last idp)) = just (λ γ → idp)
+solve (⟨⟩ , *) (Id (Var last idp) (Var (before ()) eq))
+solve (⟨⟩ , *) (Id (Var (before ()) idp) x₁)
+solve (⟨⟩ , Id (Var () idp) x₁) U 
+solve (Γ , * , *) U = nothing
+solve (Γ , * , Id (Var last idp) (Var last eq)) U = nothing
+solve (Γ , * , Id (Var last idp) (Var (before n) eq)) U  with solve Γ (subst-ty (subst-ty U {!!}) (Var n {!eq!}))
+... | nothing = nothing
+... | just res = just {!!} where
+  lemma : (γ : [ Γ ]ctx)
+          (a : A)
+          (eq' : a == coe (thing {u = a} eq) ([ Var n idp ]tm γ)) →
+            [ U ]ty (γ , a , {!!})
+  lemma = {!!}
+solve (Γ , * , Id (Var (before n) idp) x₁) U = nothing
+solve (Γ , Id x x₁ , T') U = nothing
 
 -- ctx : Context
 -- ctx = (⟨⟩ , * , * , Id (Var (before last)) (Var last))
