@@ -25,6 +25,7 @@ open Printable {{…}} public
 data ListPrintable : Set₁ where
   [] : ListPrintable
   _∷_ : {A : Set} {{_ : Printable A}} → A → ListPrintable → ListPrintable
+  [_]∷_ : {A : Set} {{_ : Printable A}} → A → ListPrintable → ListPrintable
 
 private
   split : String → List String
@@ -43,4 +44,5 @@ sprintf s l = sprintf-aux (split s) l  where
   sprintf-aux : List String → ListPrintable → String
   sprintf-aux (s ∷ []) [] = s
   sprintf-aux (s ∷ ss) (a ∷ as) = s ++ₛ print a ++ₛ sprintf-aux ss as
+  sprintf-aux (s ∷ ss) ([ a ]∷ as) = s ++ₛ print-P a ++ₛ sprintf-aux ss as
   sprintf-aux _ _ = "Error"

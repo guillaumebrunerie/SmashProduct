@@ -2,32 +2,7 @@
 
 module PathInduction where
 
-
--- Universe levels
-
-open import Agda.Primitive public using (lzero)
-  renaming (Level to ULevel; lsuc to lsucc; _⊔_ to lmax)
-
-Type : (i : ULevel) → Set (lsucc i)
-Type i = Set i
-
-
-of-type : ∀ {i} (A : Type i) (u : A) → A
-of-type A u = u
-
-infix 40 of-type
-syntax of-type A u =  u :> A
-
--- Rewriting
-
-postulate _↦_ : {i : ULevel} {A : Type i} → A → A → Type i
-{-# BUILTIN REWRITE _↦_ #-}
-
--- Identity type
-
-infix 30 _==_
-data _==_ {i : ULevel} {A : Type i} (a : A) : A → Type i where
-  idp : a == a
+open import SmashCommon
 
 data Square {i} {A : Type i} {a : A} : {b c d : A} (p : a == b) (q : c == d) (r : a == c) (s : b == d) → Type i where
   ids : Square idp idp idp idp
@@ -173,13 +148,13 @@ instance
   idc-Coh : ∀ {i} {A : Type i} {a : A} → Coh (Cube {a = a} ids ids ids ids ids ids)
   & idc-Coh = idc
 
-  -- Allows us to put the initial [a] in the [Coh]
-  strip-a : ∀ {i j} {A : Type i} {P : A → A → Type j} → ((a : A) → Coh ({b : A} → P a b)) → Coh ({a b : A} → P a b)
-  & (strip-a z) = & (z _)
+  -- -- Allows us to put the initial [a] in the [Coh]
+  -- strip-a : ∀ {i j} {A : Type i} {P : A → A → Type j} → ((a : A) → Coh ({b : A} → P a b)) → Coh ({a b : A} → P a b)
+  -- & (strip-a z) = & (z _)
 
-  -- Allows us to put the initial [Aa] in the [Coh]
-  strip-aA : ∀ {i j} {P : (A : Type i) → A → Type j} → ((A : Type i) (a : A) → Coh (P A a)) → Coh ((A : Type i) (a : A) → P A a)
-  & (strip-aA z) A a = & (z A a)
+  -- -- Allows us to put the initial [Aa] in the [Coh]
+  -- strip-aA : ∀ {i j} {P : (A : Type i) → A → Type j} → ((A : Type i) (a : A) → Coh (P A a)) → Coh ((A : Type i) (a : A) → P A a)
+  -- & (strip-aA z) A a = & (z A a)
 
   -- Allows us to put the initial [Aa] in the [Coh]
   strip-aA' : ∀ {i j} {P : (A : Type i) → A → Type j} → ((A : Type i) (a : A) → Coh (P A a)) → Coh ((A : Type i) {a : A} → P A a)
@@ -189,119 +164,95 @@ instance
   strip-aA'' : ∀ {i j} {P : (A : Type i) → A → Type j} → ((A : Type i) (a : A) → Coh (P A a)) → Coh ({A : Type i} {a : A} → P A a)
   & (strip-aA'' z) = & (z _ _)
 
-  -- Allows us to put the initial [Aa] in the [Coh]
-  strip-XYf : ∀ {i j} {P : (X Y : Type i) (f : X → Y) → X → Type j} → ((X Y : Type i) (f : X → Y) (a : X) → Coh (P X Y f a)) → Coh ({X Y : Type i} {f : X → Y} (a : X) → P X Y f a)
-  & (strip-XYf z) a = & (z _ _ _ _)
+  -- -- Allows us to put the initial [Aa] in the [Coh]
+  -- strip-XYf : ∀ {i j} {P : (X Y : Type i) (f : X → Y) → X → Type j} → ((X Y : Type i) (f : X → Y) (a : X) → Coh (P X Y f a)) → Coh ({X Y : Type i} {f : X → Y} (a : X) → P X Y f a)
+  -- & (strip-XYf z) a = & (z _ _ _ _)
 
-  -- Allows us to put the initial [Aa] in the [Coh]
-  strip-XYf' : ∀ {i j} {P : (X Y : Type i) (f : X → Y) → X → Type j} → ((X Y : Type i) (f : X → Y) (a : X) → Coh (P X Y f a)) → Coh ({X Y : Type i} {f : X → Y} {a : X} → P X Y f a)
-  & (strip-XYf' z) = & (z _ _ _ _)
+  -- -- Allows us to put the initial [Aa] in the [Coh]
+  -- strip-XYf' : ∀ {i j} {P : (X Y : Type i) (f : X → Y) → X → Type j} → ((X Y : Type i) (f : X → Y) (a : X) → Coh (P X Y f a)) → Coh ({X Y : Type i} {f : X → Y} {a : X} → P X Y f a)
+  -- & (strip-XYf' z) = & (z _ _ _ _)
 
-  -- Allows us to put the initial [Aa] in the [Coh]
-  strip-XYf'' : ∀ {i j} {P : (X Y : Type i) (f : X → Y) → X → Type j} → ((X Y : Type i) (f : X → Y) (a : X) → Coh (P X Y f a)) → Coh ({X Y : Type i} (f : X → Y) (a : X) → P X Y f a)
-  & (strip-XYf'' z) f a = & (z _ _ _ _)
+  -- -- Allows us to put the initial [Aa] in the [Coh]
+  -- strip-XYf'' : ∀ {i j} {P : (X Y : Type i) (f : X → Y) → X → Type j} → ((X Y : Type i) (f : X → Y) (a : X) → Coh (P X Y f a)) → Coh ({X Y : Type i} (f : X → Y) (a : X) → P X Y f a)
+  -- & (strip-XYf'' z) f a = & (z _ _ _ _)
 
   -- Allows us to put the initial [Aa] in the [Coh]
   strip-XYf''' : ∀ {i j} {P : (X Y : Type i) (f : X → Y) → X → Type j} → ((X Y : Type i) (f : X → Y) (a : X) → Coh (P X Y f a)) → Coh ({X Y : Type i} (f : X → Y) {a : X} → P X Y f a)
   & (strip-XYf''' z) f = & (z _ _ _ _)
 
+  strip-cst : ∀ {i j} {P : (X Y : Type i) (y : Y) (a : X) → Type j} → ((X Y : Type i) (y : Y) (a : X) → Coh  (P X Y y a))→ Coh ({X Y : Type i} (y : Y) {a : X} → P X Y y a)
+  & (strip-cst z) y = & (z _ _ y _)
+
   -- Allows us to have implicit arguments
   implicit : ∀ {i j k} {A : Type i} {B : A → Type j} {C : (a : A) → B a → Type k} → Coh ({a : A} (b : B a) → C a b) → Coh ({a : A} {b : B a} → C a b)
   & (implicit d) = & d _
 
-  -- Allows us to have explicit arguments
-  explicit : ∀ {i j k} {A : Type i} {B : A → Type j} {C : (a : A) → B a → Type k} → Coh ({a : A} (b : B a) → C a b) → Coh ((a : A) (b : B a) → C a b)
-  & (explicit d) a b = & d b
+  -- -- Allows us to have explicit arguments
+  -- explicit : ∀ {i j k} {A : Type i} {B : A → Type j} {C : (a : A) → B a → Type k} → Coh ({a : A} (b : B a) → C a b) → Coh ((a : A) (b : B a) → C a b)
+  -- & (explicit d) a b = & d b
 
 path-induction : ∀ {i} {A : Type i} {{a : A}} → A
 path-induction {{a}} = a
 
+hids : ∀ {i} → Coh ({X : Type i} {a b : X} (p : a == b) → Square p p idp idp)
+& hids idp = ids
+
+vids : ∀ {i} → Coh ({X : Type i} {a b : X} (p : a == b) → Square idp idp p p)
+& vids idp = ids
+
 module _ {i j} {A : Type i} {a : A} where
- instance
---   JCube1 : {B : (p : Square {a = a} idp idp idp idp) → Cube p ids ids ids ids ids → Type j}
---     → Coh (B ids idc) → Coh ({p : Square {a = a} idp idp idp idp} (cube : Cube p ids ids ids ids ids) → B p cube)
---   & (JCube1 {B = B} d) c = aux B (& d) c  where
-
---     comp : Coh ({a₀₀₁ a₀₁₁ a₁₀₁ a₁₁₁ : A}
---            {p₀₋₁ : a₀₀₁ == a₀₁₁} {p₋₀₁ : a₀₀₁ == a₁₀₁}
---            {p₋₁₁ : a₀₁₁ == a₁₁₁} {p₁₋₁ : a₁₀₁ == a₁₁₁}
---            (right : Square p₀₋₁ p₋₀₁ p₋₁₁ p₁₋₁)
-
---            {a₀₀₀ : A} {p₀₀₋ : a₀₀₀ == a₀₀₁}
---            {a₀₁₀ : A} {p₀₁₋ : a₀₁₀ == a₀₁₁}
---            {a₁₀₀ : A} {p₁₀₋ : a₁₀₀ == a₁₀₁}
---            {a₁₁₀ : A} {p₁₁₋ : a₁₁₀ == a₁₁₁}
-
---            {p₀₋₀ : a₀₀₀ == a₀₁₀}
---            (back : Square p₀₋₀ p₀₀₋ p₀₁₋ p₀₋₁)
---            {p₋₀₀ : a₀₀₀ == a₁₀₀}
---            (top : Square p₋₀₀ p₀₀₋ p₁₀₋ p₋₀₁)
---            {p₋₁₀ : a₀₁₀ == a₁₁₀}
---            (bottom : Square p₋₁₀ p₀₁₋ p₁₁₋ p₋₁₁)
---            {p₁₋₀ : a₁₀₀ == a₁₁₀}
---            (front : Square p₁₋₀ p₁₀₋ p₁₁₋ p₁₋₁)
---            → Square p₀₋₀ p₋₀₀ p₋₁₀ p₁₋₀)
---     comp = path-induction
-
---     fill : Coh ({a₀₀₁ a₀₁₁ a₁₀₁ a₁₁₁ : A}
---            {p₀₋₁ : a₀₀₁ == a₀₁₁} {p₋₀₁ : a₀₀₁ == a₁₀₁}
---            {p₋₁₁ : a₀₁₁ == a₁₁₁} {p₁₋₁ : a₁₀₁ == a₁₁₁}
---            (right : Square p₀₋₁ p₋₀₁ p₋₁₁ p₁₋₁)
-
---            {a₀₀₀ : A} {p₀₀₋ : a₀₀₀ == a₀₀₁}
---            {a₀₁₀ : A} {p₀₁₋ : a₀₁₀ == a₀₁₁}
---            {a₁₀₀ : A} {p₁₀₋ : a₁₀₀ == a₁₀₁}
---            {a₁₁₀ : A} {p₁₁₋ : a₁₁₀ == a₁₁₁}
-
---            {p₀₋₀ : a₀₀₀ == a₀₁₀}
---            (back : Square p₀₋₀ p₀₀₋ p₀₁₋ p₀₋₁)
---            {p₋₀₀ : a₀₀₀ == a₁₀₀}
---            (top : Square p₋₀₀ p₀₀₋ p₁₀₋ p₋₀₁)
---            {p₋₁₀ : a₀₁₀ == a₁₁₀}
---            (bottom : Square p₋₁₀ p₀₁₋ p₁₁₋ p₋₁₁)
---            {p₁₋₀ : a₁₀₀ == a₁₁₀}
---            (front : Square p₁₋₀ p₁₀₋ p₁₁₋ p₁₋₁)
---            → Cube (& comp right back top bottom front) right back top bottom front)
---     fill = path-induction
-  
---     aux :  {a₀₀₀ a₀₁₀ a₁₀₀ a₁₁₀ a₀₀₁ a₀₁₁ a₁₀₁ a₁₁₁ : A}
---            {p₀₋₀ : a₀₀₀ == a₀₁₀} {p₋₀₀ : a₀₀₀ == a₁₀₀}
---            {p₋₁₀ : a₀₁₀ == a₁₁₀} {p₁₋₀ : a₁₀₀ == a₁₁₀}
---            -- missing left
-
---            {p₀₋₁ : a₀₀₁ == a₀₁₁} {p₋₀₁ : a₀₀₁ == a₁₀₁}
---            {p₋₁₁ : a₀₁₁ == a₁₁₁} {p₁₋₁ : a₁₀₁ == a₁₁₁}
---            {right : Square p₀₋₁ p₋₀₁ p₋₁₁ p₁₋₁} -- right
-
---            {p₀₀₋ : a₀₀₀ == a₀₀₁} {p₀₁₋ : a₀₁₀ == a₀₁₁}
---            {p₁₀₋ : a₁₀₀ == a₁₀₁} {p₁₁₋ : a₁₁₀ == a₁₁₁}
---            {back : Square p₀₋₀ p₀₀₋ p₀₁₋ p₀₋₁} -- back
---            {top : Square p₋₀₀ p₀₀₋ p₁₀₋ p₋₀₁} -- top
---            {bottom : Square p₋₁₀ p₀₁₋ p₁₁₋ p₋₁₁} -- bottom
---            {front : Square p₁₋₀ p₁₀₋ p₁₁₋ p₁₋₁} -- front
---            → (B : (left : Square p₀₋₀ p₋₀₀ p₋₁₀ p₁₋₀) → Cube left right back top bottom front → Type j)
---            → B (& comp right back top bottom front) (& fill right back top bottom front) -- uncurry B (fill-cube-left right back top bottom front)
---            → ({left : Square p₀₋₀ p₋₀₀ p₋₁₀ p₁₋₀} (cube : Cube left right back top bottom front) → B left cube)
---     aux B d idc = d
-
-  postulate
-    JCube1 : {B : (p : Square {a = a} idp idp idp idp) → Cube p ids ids ids ids ids → Type j}
-      → Coh (B ids idc) → Coh ({p : Square {a = a} idp idp idp idp} (cube : Cube p ids ids ids ids ids) → B p cube)
-
-  JCube2 : {B : (p : Square {a = a} idp idp idp idp) → Cube ids p ids ids ids ids → Type j}
-    → Coh (B ids idc) → Coh ({p : Square {a = a} idp idp idp idp} (cube : Cube ids p ids ids ids ids) → B p cube)
-  & (JCube2 {B = B} d) idc = & d
-
-  postulate
-    JCube3 : {B : (p : Square {a = a} idp idp idp idp) → Cube ids ids p ids ids ids → Type j}
-      → Coh (B ids idc) → Coh ({p : Square {a = a} idp idp idp idp} (cube : Cube ids ids p ids ids ids) → B p cube)
+  instance
+    JCube2 : {B : (sq : Square {a = a} idp idp idp idp) → Cube ids sq ids ids ids ids → Type j}
+      → Coh (B ids idc) → Coh ({sq : Square {a = a} idp idp idp idp} (cube : Cube ids sq ids ids ids ids) → B sq cube)
+    & (JCube2 {B = B} d) idc = & d
 
     JCube4 : {B : (p : Square {a = a} idp idp idp idp) → Cube ids ids ids p ids ids → Type j}
       → Coh (B ids idc) → Coh ({p : Square {a = a} idp idp idp idp} (cube : Cube ids ids ids p ids ids) → B p cube)
+    & (JCube4 d) idc = & d
+
+    JCube6 : {B : (p : Square {a = a} idp idp idp idp) → Cube ids ids ids ids ids p → Type j}
+      → Coh (B ids idc) → Coh ({p : Square {a = a} idp idp idp idp} (cube : Cube ids ids ids ids ids p) → B p cube)
+    & (JCube6 d) idc = & d
+
+module _ {i j : ULevel} {A : Type i} {a : A} where
+  instance
+    JCube1 : {B : (sq : Square {a = a} idp idp idp idp) → Cube sq ids ids ids ids ids → Type j}
+      → Coh (B ids idc) → Coh ({sq : Square {a = a} idp idp idp idp} (cube : Cube sq ids ids ids ids ids) → B sq cube)
+    & (JCube1 {B = B} d) {sq} c = transport (B sq) (& flip-flip c) (& (JCube2 {B = B'} d) (& flip c))  where
+
+      flip : Coh ({b c d : A} {p : a == b} {q : c == d} {r : a == c} {s : b == d} {sq sq' : Square p q r s} → Cube sq sq' (& hids p) (& hids q) (& hids r) (& hids s) → Cube sq' sq (& hids p) (& hids q) (& hids r) (& hids s))
+      flip = path-induction
+
+      flip-flip : Coh ({b c d : A} {p : a == b} {q : c == d} {r : a == c} {s : b == d} {sq sq' : Square p q r s} (c : Cube sq sq' (& hids p) (& hids q) (& hids r) (& hids s)) → & flip (& flip c) == c)
+      flip-flip = path-induction
+
+      B' : (sq : Square {a = a} idp idp idp idp) → Cube ids sq ids ids ids ids → Type j
+      B' sq c = B sq (& flip c)
+
+
+    JCube3 : {B : (p : Square {a = a} idp idp idp idp) → Cube ids ids p ids ids ids → Type j}
+      → Coh (B ids idc) → Coh ({p : Square {a = a} idp idp idp idp} (cube : Cube ids ids p ids ids ids) → B p cube)
+    & (JCube3 {B = B} d) {sq} c = transport (B sq) (& flip-flip c) (& (JCube4 {B = B'} d) (& flip c)) where
+
+      flip : Coh ({b c d : A} {p : a == b} {q : c == d} {r : a == c} {s : b == d} {sq sq' : Square p q r s} → Cube (& hids p) (& hids q) sq sq' (& vids r) (& vids s) → Cube (& hids p) (& hids q) sq' sq (& vids r) (& vids s))
+      flip = path-induction
+
+      flip-flip : Coh ({b c d : A} {p : a == b} {q : c == d} {r : a == c} {s : b == d} {sq sq' : Square p q r s} (c : Cube (& hids p) (& hids q) sq sq' (& vids r) (& vids s)) → & flip (& flip c) == c)
+      flip-flip = path-induction
+
+      B' : (sq : Square {a = a} idp idp idp idp) → Cube ids ids ids sq ids ids → Type j
+      B' sq c = B sq (& flip c)
+
 
     JCube5 : {B : (p : Square {a = a} idp idp idp idp) → Cube ids ids ids ids p ids → Type j}
       → Coh (B ids idc) → Coh ({p : Square {a = a} idp idp idp idp} (cube : Cube ids ids ids ids p ids) → B p cube)
+    & (JCube5 {B = B} d) {sq} c = transport (B sq) (& flip-flip c) (& (JCube6 {B = B'} d) (& flip c)) where
 
-  JCube6 : {B : (p : Square {a = a} idp idp idp idp) → Cube ids ids ids ids ids p → Type j}
-    → Coh (B ids idc) → Coh ({p : Square {a = a} idp idp idp idp} (cube : Cube ids ids ids ids ids p) → B p cube)
-  & (JCube6 d) idc = & d
+      flip : Coh ({b c d : A} {p : a == b} {q : c == d} {r : a == c} {s : b == d} {sq sq' : Square p q r s} → Cube (& vids p) (& vids q) (& vids r) (& vids s) sq sq' → Cube (& vids p) (& vids q) (& vids r) (& vids s) sq' sq)
+      flip = path-induction
+
+      flip-flip : Coh ({b c d : A} {p : a == b} {q : c == d} {r : a == c} {s : b == d} {sq sq' : Square p q r s} (c : Cube (& vids p) (& vids q) (& vids r) (& vids s) sq sq') → & flip (& flip c) == c)
+      flip-flip = path-induction
+
+      B' : (sq : Square {a = a} idp idp idp idp) → Cube ids ids ids ids ids sq → Type j
+      B' sq c = B sq (& flip c)

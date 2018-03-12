@@ -79,6 +79,9 @@ data Term : Set where
   -- Cube type and constant cube
   Cube : (p q r s t u : Term) → Term
   Idc : (a : Term) → Term
+  -- HyperCube type and constant hyper cube
+  HyperCube : (p q r s t u v w : Term) → Term
+  Idhc : (a : Term) → Term
   -- Base point of the type named "A", to take the base point of a Term, use the function [pt]
   Pt : (A : String) → Term
   -- Base point of the function named "f"
@@ -262,8 +265,9 @@ print-list-term-p k (t ∷ []) = par k (print-term-P t)
 print-list-term-p k (t ∷ ts) = par k (print-term-P t ++ " " ++ print-list-term-p false ts)
 
 show-var = false
-show-implicit = true
+show-implicit = false
 show-idp = false
+show-ids = false
 show-pt = false
 
 _[unless_then_] : {A : Set} → A → Bool → A → A
@@ -282,11 +286,13 @@ print-term-p k (BaseR _ _) = "baser"
 print-term-p k (GlueL _ _ a) = par k ("gluel " ++ print-term-P a)
 print-term-p k (GlueR _ _ b) = par k ("gluer " ++ print-term-P b)
 print-term-p k (Id a b) = par k (print-term a ++ " == " ++ print-term b)
-print-term-p k (Idp a) = "idp" [unless show-idp then par k ("idp {" ++ print-term a ++ "}") ]
+print-term-p k (Idp a) = "idp" [unless show-idp then par k ("idp {a = " ++ print-term a ++ "}") ]
 print-term-p k (Square p q r s) = par k ("Square " ++ print-term-P p ++ " " ++ print-term-P q ++ " " ++ print-term-P r ++ " " ++ print-term-P s)
-print-term-p k (Ids _) = "ids"
+print-term-p k (Ids a) = "ids" [unless show-ids then par k ("ids {a = " ++ print-term a ++ "}") ]
 print-term-p k (Cube p q r s t u) = par k ("Cube " ++ print-term-P p ++ " " ++ print-term-P q ++ " " ++ print-term-P r ++ " " ++ print-term-P s ++ " " ++ print-term-P t ++ " " ++ print-term-P u)
 print-term-p k (Idc _) = "idc"
+print-term-p k (HyperCube p q r s t u v w) = par k ("HyperCube " ++ print-term-P p ++ " " ++ print-term-P q ++ " " ++ print-term-P r ++ " " ++ print-term-P s ++ " " ++ print-term-P t ++ " " ++ print-term-P u ++ " " ++ print-term-P v ++ " " ++ print-term-P w)
+print-term-p k (Idhc _) = "idhc"
 print-term-p k (Pt A) = "pt" [unless show-pt then par k ("pt {" ++ A ++ "}") ]
 print-term-p k (Ptf f A B) = par k ("ptf " ++ f)
 print-term-p k (Lam x A u) = par k ("λ " ++ x ++ " → " ++ print-term u)
@@ -336,7 +342,7 @@ print-coherence : Coherence → String
 print-coherence d = name d ++ " : Coh (" ++ print-term (type d) ++ ")\n" ++ name d ++ " = path-induction"
 
 print-other : Other → String
-print-other o = name o ++ " : " ++ print-term (type o) ++ "\n" ++ name o ++ definition o
+print-other o = name o ++ " : " ++ print-term (type o) ++ "\n" ++ definition o
 
 print-definition : Definition → String
 print-definition (Dec d) = generate-body d
@@ -413,6 +419,8 @@ is-fresh-in s (Square p q r ss) = is-fresh-in s p ∧ is-fresh-in s q ∧ is-fre
 is-fresh-in s (Ids a) = is-fresh-in s a
 is-fresh-in s (Cube p q r ss t u) = is-fresh-in s p ∧ is-fresh-in s q ∧ is-fresh-in s r ∧ is-fresh-in s ss ∧ is-fresh-in s t ∧ is-fresh-in s u
 is-fresh-in s (Idc a) = is-fresh-in s a
+is-fresh-in s (HyperCube p q r ss t u v w) = is-fresh-in s p ∧ is-fresh-in s q ∧ is-fresh-in s r ∧ is-fresh-in s ss ∧ is-fresh-in s t ∧ is-fresh-in s u ∧ is-fresh-in s v ∧ is-fresh-in s w
+is-fresh-in s (Idhc a) = is-fresh-in s a
 is-fresh-in s (Pt A) = not (s ==ₛ A)
 is-fresh-in s (Ptf f A B) = not (s ==ₛ f) ∧ is-fresh-in s A ∧ is-fresh-in s B
 is-fresh-in s (Lam s' A t) = is-fresh-in s A ∧ ((s ==ₛ s') ∨ (not (s ==ₛ s') ∧ is-fresh-in s t))
@@ -468,6 +476,7 @@ dimension : Term → ℕ
 dimension (Id a _) = suc (dimension (get-type a))
 dimension (Square p q r s) = suc (dimension (get-type p))
 dimension (Cube p q r s t u) = suc (dimension (get-type p))
+dimension (HyperCube p q r s t u v w) = suc (dimension (get-type p))
 dimension _ = 0
 
 {- Returns the domain of the given function type -}
@@ -503,6 +512,7 @@ mhs : Term → Term
 mhs (Id a _) = get-type a
 mhs (Square p q r s) = mhs (get-type p)
 mhs (Cube p q r s t u) = mhs (get-type p)
+mhs (HyperCube p q r s t u v w) = mhs (get-type p)
 mhs t = Error ("mhs " ++ print t)
 
 first-side : Term → Term
@@ -574,6 +584,8 @@ u [ t / s ] = u [ [ t ] /[] [ s ] ]
 (Ids a) [ t /[] s ] = Ids (a [ t /[] s ])
 (Cube p q r ss ttt u) [ t /[] s ] = Cube (p [ t /[] s ]) (q [ t /[] s ]) (r [ t /[] s ]) (ss [ t /[] s ]) (ttt [ t /[] s ]) (u [ t /[] s ])
 (Idc a) [ t /[] s ] = Idc (a [ t /[] s ])
+(HyperCube p q r ss ttt u v w) [ t /[] s ] = HyperCube (p [ t /[] s ]) (q [ t /[] s ]) (r [ t /[] s ]) (ss [ t /[] s ]) (ttt [ t /[] s ]) (u [ t /[] s ]) (v [ t /[] s ]) (w [ t /[] s ])
+(Idhc a) [ t /[] s ] = Idhc (a [ t /[] s ])
 (Pt x) [ t /[] s ] with find x s t
 ... | nothing = Pt x
 ... | just (k , _ , _) = pt k
@@ -641,39 +653,51 @@ ap f p =
   else
     Error ("ap error : " ++ print-P f ++ " " ++ print-P p ++ " / " ++ print-P (mhs (get-type p)) ++ " " ++ print-P (get-type f))
 
-ap□ : Term → Term → Term
-ap□ f sq = AppReduce (App (Atom "ap□") f) sq
+ap+ : Term → Term → Term
+ap+ f sq = AppReduce (App (Atom "ap+") f) sq
 
-ap-square : Term → Term → Term
-ap-square f sq = AppReduce (App (Atom "ap-square") f) sq
+ap² : Term → Term → Term
+ap² f sq = AppReduce (App (Atom "ap²") f) sq
 
 ap-∘ : Term → Term → Term → Term
 ap-∘ f g p = AppReduce (App (App (Atom "ap-∘") f) g) p
 
+ap-cst : Term → Term → Term
+ap-cst k p = AppReduce (App (Atom "ap-cst") k) p
+
 pattern apᵖ f p = App (App (Atom "ap") f) p
-pattern ap□ᵖ k p = App (App (Atom "ap□") k) p
-pattern ap-squareᵖ f sq = App (App (Atom "ap-square") f) sq
+pattern ap²ᵖ f sq = App (App (Atom "ap²") f) sq
+pattern ap³ f cu = App (App (Atom "ap³") f) cu
+pattern ap+ᵖ k p = App (App (Atom "ap+") k) p
+
 pattern ap-idf p = App (Atom "ap-idf") p
-pattern ap-square-idf sq = App (Atom "ap-square-idf") sq
-pattern ap-square-∘ g f sq = App (App (App (Atom "ap-square-∘") g) f) sq
-pattern ap-cst a p = App (App (Atom "ap-cst") a) p
-pattern ap□-cst q p = App (App (Atom "ap□-cst") q) p
+
+pattern ap-cstᵖ a p = App (App (Atom "ap-cst") a) p
+pattern ap²-cst k sq = App (App (Atom "ap²-cst") k) sq
+pattern ap+-cst q p = App (App (Atom "ap+-cst") q) p
+
 pattern ap-∘ᵖ g f p = App (App (App (Atom "ap-∘") g) f) p
-pattern ap-∘-idfl g p = App (App (Atom "ap-∘-idfl") g) p
-pattern ap□-∘-eq g f p eq = App (App (App (App (Atom "ap□-∘-eq") g) f) p) eq
-pattern ap□-∘-idf g p = App (App (Atom "ap□-∘-idf") g) p
-pattern ap□-∘2 f g p = App (App (App (Atom "ap□-∘2") f) g) p
-pattern ap-cube f cu = App (App (Atom "ap-cube") f) cu
+pattern ap²-∘ g f sq = App (App (App (Atom "ap²-∘") g) f) sq
+pattern ap+-∘1 f g p = App (App (App (Atom "ap+-∘1") f) g) p
+pattern ap+-∘2 f g p = App (App (App (Atom "ap+-∘2") f) g) p
+pattern ap+-∘3 f g h p = App (App (App (App (Atom "ap+-∘3") f) g) h) p
+
 pattern ap-∘3 f g h p = App (App (App (App (Atom "ap-∘3") f) g) h) p
 pattern ap-∘-cst f b p = App (App (App (Atom "ap-∘-cst") f) b) p
 pattern ap-∘-cst2 c f p = App (App (App (Atom "ap-∘-cst2") c) f) p
-pattern ap-∘3-cst f c h p = App (App (App (App (Atom "ap-∘3-cst") f) c) h) p
-pattern ap□-idp f p = App (App (Atom "ap□-idp") f) p
-pattern ap□+ f sq = App (App (Atom "ap□+") f) sq
-pattern ap□-= α p = App (App (Atom "ap□-=") α) p
-pattern ap□-∘3 f g h p = App (App (App (App (Atom "ap□-∘3") f) g) h) p
+pattern ap+-idp f p = App (App (Atom "ap+-idp") f) p
+pattern ap²+ f sq = App (App (Atom "ap²+") f) sq
+pattern ap++ f k = App (App (Atom "ap++") f) k
 
 pattern axiom term type = AppI term (App (Atom "axiom") type)
+
+{- Unused
+pattern ap+-= α p = App (App (Atom "ap+-=") α) p
+pattern ap²-idf sq = App (Atom "ap²-idf") sq
+pattern ap-∘-idfl g p = App (App (Atom "ap-∘-idfl") g) p
+pattern ap+-∘-eq g f p eq = App (App (App (App (Atom "ap+-∘-eq") g) f) p) eq
+pattern ap-∘3-cst f c h p = App (App (App (App (Atom "ap-∘3-cst") f) c) h) p
+-}
 
 &coh∙□ = Var "& coh∙□" (PiI "X" Type (PiI "a" Xₜ (PiI "b" Xₜ (PiI "p" a=bₜ (PiI "q" a=bₜ (Pi "α" (Square (Var "p" a=bₜ) (Var "q" a=bₜ) (Idp aₜX) (Idp bₜX)) (PiI "r" a=bₜ (Pi "β" (Square (Var "q" a=bₜ) (Var "r" a=bₜ) (Idp aₜX) (Idp bₜX)) (Square (Var "p" a=bₜ) (Var "r" a=bₜ) (Idp aₜX) (Idp bₜX))))))))))
 
@@ -774,7 +798,7 @@ glue-β□ : Declaration → List Term → LR → Term → Term → Term → Ter
 glue-β□ dec args lr A B ab =
   let cohapp = apply-path-single dec args (Glue lr A B ab) in
   axiom (App[] (Atom (name dec ++ glue-β-name lr)) (map Exp args ++ₗ [ Exp ab ]))
-        (Cube (ap□ (Dec dec args) (Glue lr A B ab))
+        (Cube (ap+ (Dec dec args) (Glue lr A B ab))
               cohapp
               (hids (first-side (get-type cohapp)))
               (hids (second-side (get-type cohapp)))
@@ -796,29 +820,29 @@ get-type (apᵖ f p) with get-type p
 ... | Id a b = if get-type a ==ₜ get-domain (get-type f) then Id (AppReduce f a) (AppReduce f b) else Error ("ap error : " ++ print-P f ++ " " ++ print-P p ++ " / " ++ print-P (mhs (get-type p)) ++ " " ++ print-P (get-type f))
 ... | _ = Error "get-type ap"
 
-get-type (ap-squareᵖ f sq) with get-type sq
+get-type (ap²ᵖ f sq) with get-type sq
 ... | Square p q r s = Square (ap f p) (ap f q) (ap f r) (ap f s)
-... | _ = Error ("get-type ap-square " ++ print sq ++ " / " ++ print (get-type sq))
+... | _ = Error ("get-type ap² " ++ print sq ++ " / " ++ print (get-type sq))
 
-get-type (ap□ᵖ k p) with get-type k | get-type p
+get-type (ap+ᵖ k p) with get-type k | get-type p
 ... | Pi x A (Id f g) | Id a b =
   if get-type a ==ₜ A then
     Square (AppReduce k a) (AppReduce k b) (ap (eta-contract (Lam x A f)) p) (ap (eta-contract (Lam x A g)) p)
   else
-    Error ("ap□ error " ++ print-P k  ++ " / " ++ print-P p ++ " / " ++ print-P (mhs (get-type p)) ++ " / " ++ print-P (get-domain (get-type k)))
-... | _ | _ = Error ("get-type ap□ " ++ print-P k ++ " / " ++ print-P p)
+    Error ("ap+ error " ++ print-P k  ++ " / " ++ print-P p ++ " / " ++ print-P (mhs (get-type p)) ++ " / " ++ print-P (get-domain (get-type k)))
+... | _ | _ = Error ("get-type ap+ " ++ print-P k ++ " / " ++ print-P p)
 
-get-type (ap-cst a p) =
+get-type (ap-cstᵖ a p) =
   let X = mhs (get-type p) in
   let x = fresh (X ∷ a ∷ []) "x" in
   Square (ap (Lam x X a) p) (Idp a) (Idp a) (Idp a)
 
-get-type (ap□-cst q p) =
+get-type (ap+-cst q p) =
   let X = get-type q in
   let x = fresh (mhs (get-type p) ∷ q ∷ []) "x" in
   let b = lhs X in
   let b' = rhs X in
-  Cube (ap□ (Lam x (mhs (get-type p)) q) p) (hids q) (hids q) (hids q) (ap-cst b p) (ap-cst b' p)
+  Cube (ap+ (Lam x (mhs (get-type p)) q) p) (hids q) (hids q) (hids q) (ap-cst b p) (ap-cst b' p)
 
 get-type (ap-idf p) =
   let A = mhs (get-type p) in
@@ -826,23 +850,23 @@ get-type (ap-idf p) =
   let b = rhs (get-type p) in  
   Square (ap (idf A) p) p (Idp a) (Idp b)
 
-get-type (ap-∘-idfl g p) =
-  let A = mhs (get-type p) in
-  let B = get-codomain (get-type g) in
-  let a = lhs (get-type p) in
-  let a' = rhs (get-type p) in
-  Cube (ap-∘ (idf B) g p) (hids (ap g p)) (hids (ap g p)) (ap-idf (ap g p)) (Ids (AppReduce g a)) (Ids (AppReduce g a'))
+-- get-type (ap-∘-idfl g p) =
+--   let A = mhs (get-type p) in
+--   let B = get-codomain (get-type g) in
+--   let a = lhs (get-type p) in
+--   let a' = rhs (get-type p) in
+--   Cube (ap-∘ (idf B) g p) (hids (ap g p)) (hids (ap g p)) (ap-idf (ap g p)) (Ids (AppReduce g a)) (Ids (AppReduce g a'))
 
-get-type (ap-square-idf sq) with get-type sq
-... | Square p q r s =
-  let A = mhs (get-type p) in
-  Cube (ap-square (idf A) sq) sq (ap-idf p) (ap-idf q) (ap-idf r) (ap-idf s)
-... | _ = Error "get-type of ap-square-idf"
+-- get-type (ap²-idf sq) with get-type sq
+-- ... | Square p q r s =
+--   let A = mhs (get-type p) in
+--   Cube (ap² (idf A) sq) sq (ap-idf p) (ap-idf q) (ap-idf r) (ap-idf s)
+-- ... | _ = Error "get-type of ap²-idf"
 
-get-type (ap-square-∘ g f sq) with get-type sq
+get-type (ap²-∘ g f sq) with get-type sq
 ... | Square p q r s =
-  Cube (ap-square (g ∘ f) sq) (ap-square g (ap-square f sq)) (ap-∘ g f p) (ap-∘ g f q) (ap-∘ g f r) (ap-∘ g f s)
-... | _ = Error "get-type of ap-square-∘"
+  Cube (ap² (g ∘ f) sq) (ap² g (ap² f sq)) (ap-∘ g f p) (ap-∘ g f q) (ap-∘ g f r) (ap-∘ g f s)
+... | _ = Error "get-type of ap²-∘"
 
 get-type (ap-∘ᵖ g f p) =
   let a = lhs (get-type p) in
@@ -852,94 +876,121 @@ get-type (ap-∘ᵖ g f p) =
 get-type (ap-∘3 f g h p) =
   let fgha = AppReduce f (AppReduce g (AppReduce h (lhs (get-type p)))) in
   let fghb = AppReduce f (AppReduce g (AppReduce h (rhs (get-type p)))) in
-  Cube (ap-∘ (f ∘ g) h p) (ap-square f (ap-∘ g h p)) (ap-∘ f (g ∘ h) p) (ap-∘ f g (ap h p)) (Ids fgha) (Ids fghb)
+  Cube (ap-∘ (f ∘ g) h p) (ap² f (ap-∘ g h p)) (ap-∘ f (g ∘ h) p) (ap-∘ f g (ap h p)) (Ids fgha) (Ids fghb)
 
 
-get-type (ap□-∘-eq (Lam var Z g) f p (Lam v2 T eq)) =
-  let a = eta-contract (Lam var Z (lhs (get-type g))) in
-  let b = eta-contract (Lam var Z (rhs (get-type g))) in
+-- get-type (ap+-∘-eq (Lam var Z g) f p (Lam v2 T eq)) =
+--   let a = eta-contract (Lam var Z (lhs (get-type g))) in
+--   let b = eta-contract (Lam var Z (rhs (get-type g))) in
+--   let y = lhs (get-type p) in
+--   let z = rhs (get-type p) in
+--   let res = eta-contract (Lam v2 T (second-side (get-type eq))) in
+--   Cube (ap+ res p)
+--        (ap² f (ap+ (eta-contract (Lam var Z g)) p))
+--        (hinv (eq [ y / v2 ]))
+--        (hinv (eq [ z / v2 ]))
+--        (ap-∘ f a p)
+--        (ap-∘ f b p)
+
+get-type (ap+-∘1 f (Lam x X g) p) =
+  let a = eta-contract (Lam x X (lhs (get-type g))) in
+  let b = eta-contract (Lam x X (rhs (get-type g))) in
   let y = lhs (get-type p) in
   let z = rhs (get-type p) in
-  let res = eta-contract (Lam v2 T (second-side (get-type eq))) in
-  Cube (ap□ res p)
-       (ap-square f (ap□ (eta-contract (Lam var Z g)) p))
-       (hinv (eq [ y / v2 ]))
-       (hinv (eq [ z / v2 ]))
+  Cube (ap+ (Lam x X (ap f g)) p)
+       (ap² f (ap+ (eta-contract (Lam x X g)) p))
+       (hids (ap f (g [ y / x ])))
+       (hids (ap f (g [ z / x ])))
        (ap-∘ f a p)
        (ap-∘ f b p)
 
-get-type (ap□-∘-idf (Lam var Z g) p) =
-  let a = eta-contract (Lam var Z (lhs (get-type g))) in
-  let b = eta-contract (Lam var Z (rhs (get-type g))) in
-  let y = lhs (get-type p) in
-  let z = rhs (get-type p) in
-  Cube (ap□ (eta-contract (Lam var Z (ap (idf (mhs (get-type g))) g))) p)
-       (ap□ (eta-contract (Lam var Z g)) p)
-       (ap-idf (g [ y / var ]))
-       (ap-idf (g [ z / var ]))
-       (hids (ap a p))
-       (hids (ap b p))
-
-get-type (ap□-∘2 f@(Lam var Z f-inner) g p) =
+get-type (ap+-∘2 f@(Lam var Z f-inner) g p) =
   let y = lhs (get-type p) in
   let z = rhs (get-type p) in
   let a = eta-contract (Lam var Z (lhs (get-type f-inner))) in
   let b = eta-contract (Lam var Z (rhs (get-type f-inner))) in
-  Cube (ap□ (f ∘ g) p) (ap□ f (ap g p)) (hids (AppReduce f (AppReduce g y))) (hids (AppReduce f (AppReduce g z))) (ap-∘ a g p) (ap-∘ b g p)
+  Cube (ap+ (f ∘ g) p) (ap+ f (ap g p)) (hids (AppReduce f (AppReduce g y))) (hids (AppReduce f (AppReduce g z))) (ap-∘ a g p) (ap-∘ b g p)
 
-get-type (ap-cube f cu) with get-type cu
-... | Cube p q r s t u = Cube (ap-square f p) (ap-square f q) (ap-square f r) (ap-square f s) (ap-square f t) (ap-square f u)
-... | _ = Error "get-type ap-cube"
+get-type (ap³ f cu) with get-type cu
+... | Cube p q r s t u = Cube (ap² f p) (ap² f q) (ap² f r) (ap² f s) (ap² f t) (ap² f u)
+... | _ = Error "get-type ap³"
 
 get-type (ap-∘-cst f b p) =
   let X = mhs (get-type p) in
   let x = fresh (X ∷ b ∷ []) "x" in
   let fb = AppReduce f b in
-  Cube (ap-cst fb p) (ap-square f (ap-cst b p)) (ap-∘ f (Lam x X b) p) (Ids fb) (Ids fb) (Ids fb)
+  Cube (ap-cst fb p) (ap² f (ap-cst b p)) (ap-∘ f (Lam x X b) p) (Ids fb) (Ids fb) (Ids fb)
 
 get-type (ap-∘-cst2 c f p) =
   let X = get-codomain (get-type f) in
   let x = fresh (X ∷ c ∷ []) "x" in
   Cube (ap-∘ (Lam x X c) f p) (Ids c) (ap-cst c p) (ap-cst c (ap f p)) (Ids c) (Ids c)
 
-get-type (ap-∘3-cst f c h p) =
-  let fc = AppReduce f c in
-  let A = get-domain (get-type h) in
-  let B = get-codomain (get-type h) in
-  let x = fresh (A ∷ B ∷ f ∷ c ∷ []) "x" in
-  Cube (ap-square f (ap-∘ (Lam x B c) h p)) (ap-square f (ap-cst c p)) (hids (ap f (ap (Lam x A c) p))) (ap-square f (ap-cst c (ap h p))) (Ids fc) (Ids fc)
+-- get-type (ap-∘3-cst f c h p) =
+--   let fc = AppReduce f c in
+--   let A = get-domain (get-type h) in
+--   let B = get-codomain (get-type h) in
+--   let x = fresh (A ∷ B ∷ f ∷ c ∷ []) "x" in
+--   Cube (ap² f (ap-∘ (Lam x B c) h p)) (ap² f (ap-cst c p)) (hids (ap f (ap (Lam x A c) p))) (ap² f (ap-cst c (ap h p))) (Ids fc) (Ids fc)
 
-get-type (ap□-idp f@(Lam var T f-in) p) =
+get-type (ap+-idp f@(Lam var T f-in) p) =
   let x = lhs (get-type p) in
   let y = rhs (get-type p) in
   let X = mhs (get-type p) in
-  Cube (ap□ (Lam var T (Idp f-in)) p) (vids (ap f p)) (Ids (AppReduce f x)) (Ids (AppReduce f y)) (hids (ap f p)) (hids (ap f p))
+  Cube (ap+ (Lam var T (Idp f-in)) p) (vids (ap f p)) (Ids (AppReduce f x)) (Ids (AppReduce f y)) (hids (ap f p)) (hids (ap f p))
 
-get-type (ap□+ α@(Lam x X α-in) sq) =
+get-type (ap²+ α@(Lam x X α-in) sq) =
   let p = first-side (get-type sq) in
   let q = second-side (get-type sq) in
   let r = third-side (get-type sq) in
   let s = fourth-side (get-type sq) in
   let f = eta-contract (Lam x X (lhs (get-type α-in))) in
   let g = eta-contract (Lam x X (rhs (get-type α-in))) in
-  Cube (ap□ α p) (ap□ α q) (ap□ α r) (ap□ α s) (ap-square f sq) (ap-square g sq)
+  Cube (ap+ α p) (ap+ α q) (ap+ α r) (ap+ α s) (ap² f sq) (ap² g sq)
 
-get-type t@(ap□-= α p) with get-type α | get-type p
-... | Pi x X (Square f g (Idp _) (Idp _)) | Id y z =
-  Cube (ap□ (eta-contract (Lam x X f)) p) (ap□ (Lam x X g) p) (AppReduce α y) (AppReduce α z) (hids (ap (Lam x X (lhs (get-type f))) p)) (hids (ap (Lam x X (rhs (get-type f))) p))
-... | _ | _ = Error ("get-type ap□-= " ++ print t)
+get-type t@(ap++ f k) with get-type f | get-type k
+... | Pi x X (Square p q r s) | Id y z =
+  Cube (AppReduce f y)
+       (AppReduce f z)
+       (ap+ (eta-contract (Lam x X p)) k)
+       (ap+ (eta-contract (Lam x X q)) k)
+       (ap+ (eta-contract (Lam x X r)) k)
+       (ap+ (eta-contract (Lam x X s)) k)
+... | _ | _ = Error ("get-type ap++ " ++ print t)
 
-get-type t@(ap□-∘3 f g h p) with get-type g | get-type p
+-- get-type t@(ap+-= α p) with get-type α | get-type p
+-- ... | Pi x X (Square f g (Idp _) (Idp _)) | Id y z =
+--   Cube (ap+ (eta-contract (Lam x X f)) p)
+--        (ap+ (eta-contract (Lam x X g)) p)
+--        (AppReduce α y)
+--        (AppReduce α z)
+--        (hids (ap (eta-contract (Lam x X (lhs (get-type f)))) p))
+--        (hids (ap (eta-contract (Lam x X (rhs (get-type f)))) p))
+-- ... | _ | _ = Error ("get-type ap+-= " ++ print t)
+
+get-type t@(ap+-∘3 f g h p) with get-type g | get-type p
 ... | Pi x A (Id a b) | Id y z =
   let X = get-domain (get-type h) in
   let v = fresh (f ∷ g ∷ h ∷ []) "x" in
-  Cube (ap□ (Lam v X (ap f (AppReduce g (AppReduce h (Var v X))))) p)
-       (ap□ (Lam v A (ap f (AppReduce g (Var v A)))) (ap (eta-contract h) p))
+  Cube (ap+ (Lam v X (ap f (AppReduce g (AppReduce h (Var v X))))) p)
+       (ap+ (Lam v A (ap f (AppReduce g (Var v A)))) (ap (eta-contract h) p))
        (hids (ap f (AppReduce g (AppReduce h y))))
        (hids (ap f (AppReduce g (AppReduce h z))))
        (ap-∘ (f ∘ (eta-contract (Lam x A a))) h p)
        (ap-∘ (f ∘ (eta-contract (Lam x A b))) h p)
-... | _ | _ = Error ("get-type ap□-∘3 " ++ print t)
+... | _ | _ = Error ("get-type ap+-∘3 " ++ print t)
+
+get-type t@(ap²-cst k sq) with get-type sq
+... | Square p q r s =
+  let X = mhs (get-type p) in
+  let x = fresh [ k ] "x" in
+  Cube (ap² (Lam x X k) sq)
+       (Ids k)
+       (ap-cst k p)
+       (ap-cst k q)
+       (ap-cst k r)
+       (ap-cst k s)
+... | _ = Error ("get-type ap²-cst " ++ print t)
 
 get-type (axiom term type) = type
 
@@ -955,6 +1006,8 @@ get-type (Square p q r s) = Type
 get-type (Ids a) = Square (Idp a) (Idp a) (Idp a) (Idp a)
 get-type (Cube p q r s t u) = Type
 get-type (Idc a) = Cube (Ids a) (Ids a) (Ids a) (Ids a) (Ids a) (Ids a)
+get-type (HyperCube p q r s t u v w) = Type
+get-type (Idhc a) = HyperCube (Idc a) (Idc a) (Idc a) (Idc a) (Idc a) (Idc a) (Idc a) (Idc a)
 get-type (Pt s) = Var s Type
 get-type (Ptf f A B) = Id (AppReduce (Var f (PtdMap A B)) (pt A)) (pt B)
 get-type Ptd = Type
@@ -982,6 +1035,8 @@ Square p q r s ==ₜ Square p' q' r' s' = (p ==ₜ p') ∧ (q ==ₜ q') ∧ (r =
 Ids a ==ₜ Ids a' = (a ==ₜ a')
 Cube p q r s t u ==ₜ Cube p' q' r' s' t' u' = (p ==ₜ p') ∧ (q ==ₜ q') ∧ (r ==ₜ r') ∧ (s ==ₜ s') ∧ (t ==ₜ t') ∧ (u ==ₜ u')
 Idc a ==ₜ Idc a' = (a ==ₜ a')
+HyperCube p q r s t u v w ==ₜ HyperCube p' q' r' s' t' u' v' w' = (p ==ₜ p') ∧ (q ==ₜ q') ∧ (r ==ₜ r') ∧ (s ==ₜ s') ∧ (t ==ₜ t') ∧ (u ==ₜ u') ∧ (v ==ₜ v') ∧ (w ==ₜ w')
+Idhc a ==ₜ Idhc a' = (a ==ₜ a')
 Pt s ==ₜ Pt s' = s ==ₛ s'
 Ptf f A B ==ₜ Ptf f' A' B' = (f ==ₛ f') ∧ (A ==ₜ A') ∧ (B ==ₜ B')
 Lam s A t ==ₜ Lam s' A' t' =
@@ -1043,6 +1098,7 @@ get-root-type : Term → Term
 get-root-type (Id a b) = get-root-type (get-type a)
 get-root-type (Square p q r s) = get-root-type (get-type p)
 get-root-type (Cube p q r s t u) = get-root-type (get-type p)
+get-root-type (HyperCube p q r s t u v w) = get-root-type (get-type p)
 get-root-type t = t
 
 {- Given a function [f] and an element [u] in one of the iterated identity
@@ -1066,9 +1122,9 @@ ap* f u =
     ap*-internal z T@(Id v w) =
       ap        (Lam z (mhs T) (ap* f (Var z (mhs T)))) u
     ap*-internal z T@(Square p q r s) =
-      ap-square (Lam z (mhs T) (ap* f (Var z (mhs T)))) u
+      ap² (Lam z (mhs T) (ap* f (Var z (mhs T)))) u
     ap*-internal z T@(Cube p q r s t _) =
-      ap-cube   (Lam z (mhs T) (ap* f (Var z (mhs T)))) u
+      ap³   (Lam z (mhs T) (ap* f (Var z (mhs T)))) u
     ap*-internal z _ = Error "ap*-internal"
 
 ap*Arg : Term → Arg Term → Arg Term
@@ -1080,12 +1136,14 @@ vars = map (λ {(s , t) → hiding-app s (Var (unArg s) t)})
 
 
 Yₜ = Var "Y" Type
+yₜY = Var "y" Yₜ
 X→Yₜ = Pi "_" Xₜ Yₜ
 fₜX→Y = Var "f" X→Yₜ
 
 apcohify : String → Term → List (Arg Term) → Term → Term
+apcohcstify : String → Term → List (Arg Term) → Term → Term
 ap/cohify : String → Term → Term → String → Term → List (Arg Term) → Term
-ap□cohify : String → Term → List (Arg Term) → Term → Term
+ap+cohify : String → Term → List (Arg Term) → Term → Term
 
 is-pt : Term → Bool
 is-pt t with get-type t
@@ -1220,6 +1278,7 @@ extend-CC-with t u ctx with get-type u
 ... | Id a b = test-or-concat t u (extendx-CC-filter (a ∷ b ∷ []) t ctx)
 ... | Square p q r s = test-or-concat t u (extendx-CC-filter (p ∷ q ∷ r ∷ s ∷ []) t ctx)
 ... | Cube p q r s ttt uu = test-or-concat t u (extendx-CC-filter (p ∷ q ∷ r ∷ s ∷ ttt ∷ uu ∷ []) t ctx)
+... | HyperCube p q r s ttt uu v w = test-or-concat t u (extendx-CC-filter (p ∷ q ∷ r ∷ s ∷ ttt ∷ uu ∷ v ∷ w ∷ []) t ctx)
 ... | _ = trerror ("extend-CC-with " ++ print-P u) ctx
 
 ap-CC : Term → List (Term × Term) → List (Term × Term) → List (Term × Term)
@@ -1234,10 +1293,12 @@ root-type : Term → Term
 root-type (Id a b) = root-type a
 root-type (Square p q r s) = root-type p
 root-type (Cube p q r s t u) = root-type p
+root-type (HyperCube p q r s t u v w) = root-type p
 root-type t with get-type t
 ... | Id a b = root-type a
 ... | Square p q r s = root-type p
 ... | Cube p q r s ttt u = root-type p
+... | HyperCube p q r s ttt u v w = root-type p
 ... | _ = get-type t
 
 add-sides : List (Term × Term) → Term → List (Term × Term)
@@ -1245,6 +1306,7 @@ add-sides ctx t with get-type t
 ... | Id a b = extendx-CC ctx (a ∷ b ∷ [])
 ... | Square p q r s = extendx-CC ctx (p ∷ q ∷ r ∷ s ∷ [])
 ... | Cube p q r s ttt u = extendx-CC ctx (p ∷ q ∷ r ∷ s ∷ ttt ∷ u ∷ [])
+... | HyperCube p q r s ttt u v w = extendx-CC ctx (p ∷ q ∷ r ∷ s ∷ ttt ∷ u ∷ v ∷ w ∷ [])
 ... | _ = ctx
 
 extend-CC ctx t =
@@ -1266,6 +1328,49 @@ looks-trivial (Proj u v) = (looks-trivial u) ∨ (looks-trivial v)
 looks-trivial (App f arg) = looks-trivial arg
 looks-trivial t = is-pt t
 
+{- [reduce-ap f p] returns the square witnessing the reduction of [ap f p] -}
+reduce-ap : Term → Term → Maybe Term
+reduce-ap f p with split f | p
+... | Idf | Glue _ _ _ _ =
+  just (ap-idf p)
+... | Cst k | _ =
+  just (ap-cst k p)
+... | Projpt lr A B | Glue _ _ _ _ =
+  just (ap+ (glue A B lr) p)
+... | SingleDec dec args | Glue lr A B u =
+  just (glue-β dec args lr A B u)
+... | InnerDec dec args g | Glue _ _ _ _ =
+  just (ap-∘ g (Dec dec args) p)
+... | _ | apᵖ (Dec dec args) (Glue lr A B u) =
+  just (ap² f (glue-β dec args lr A B u))
+... | _ | apᵖ g q =
+  just (ap-∘ f g q)
+... | _ | _ =
+  let Appp s ty args = unapp p in
+  if isCoh s then
+    just (apcohify s ty args f)
+  else
+    nothing
+
+isCstApCoh : String → List (Arg Term) → Bool
+isCstApCoh s (X ∷ Y ∷ Exp f ∷ _) with toList s | split f
+... | '&' ∷ ' ' ∷ 'a' ∷ 'p' ∷ _ | Cst y = true
+... | _ | _ = false
+isCstApCoh _ _ = false
+
+ploup : String → String
+ploup s with toList s
+... | '&' ∷ ' ' ∷ 'a' ∷ 'p' ∷ rest = fromList ('&' ∷ ' ' ∷ rest)
+... | _ = "ploup"
+
+uncstapcoh : String → Term → List (Arg Term) → String × Term × List (Arg Term) × Term
+uncstapcoh s ty (X ∷ Y ∷ Exp (Lam _ _ y) ∷ rest) = (ploup s , get-thing ty , X ∷ rest , y)  where
+  get-thing : Term → Term
+  get-thing (PiEI _ _ B) = get-thing B
+  get-thing (Square _ u _ _) = let Appp _ ty _ = unapp u in ty
+  get-thing _ = Error "get-thing"
+uncstapcoh _ _ _ = trerror "uncstapcoh" ("XXXX", Error "uncstapcoh" , [] , Error "uncstapcoh")
+
 {- Invariants:
    - The term we are adding is not already present
    - All of its sides are already present
@@ -1274,6 +1379,7 @@ looks-trivial t = is-pt t
 extend-CC-aux ctx (Id a b) = extendx-CC ctx (a ∷ b ∷ [])
 extend-CC-aux ctx (Square p q r s) = extendx-CC ctx (p ∷ q ∷ r ∷ s ∷ [])
 extend-CC-aux ctx (Cube p q r s ttt u) = extendx-CC ctx (p ∷ q ∷ r ∷ s ∷ ttt ∷ u ∷ [])
+extend-CC-aux ctx (HyperCube p q r s ttt u v w) = extendx-CC ctx (p ∷ q ∷ r ∷ s ∷ ttt ∷ u ∷ v ∷ w ∷ [])
 extend-CC-aux ctx (Idp a) = extend-CC ctx a
 extend-CC-aux ctx (Ids a) = extend-CC ctx a
 extend-CC-aux ctx (Idc a) = extend-CC ctx a
@@ -1284,7 +1390,7 @@ extend-CC-aux ctx t@(Glue lr A B ab) =
     let pq = choose lr (find-Id-proj-pt (Proj ab (pt B)) (Lam xy A (Proj (Var xy A) (pt B))) ctx)
                        (find-Id-proj-pt (Proj (pt A) ab) (Lam xy B (Proj (pt A) (Var xy B))) ctx)
     in
-    extend-CC-with (Glue lr A B ab) (ap□ (glue A B lr) pq) ctx
+    extend-CC-with (Glue lr A B ab) (ap+ (glue A B lr) pq) ctx
 
 extend-CC-aux ctx (Proj a b) =
   if is-pt a then
@@ -1305,267 +1411,104 @@ extend-CC-aux ctx (Proj a b) =
     ap-CC (Lam y B (Proj a (Var y B))) lB (extend-CC ctx (GlueL A B a)))
   else trerror ("BIG ERROR extend-CC (" ++ print a ++ " / " ++ print b ++ ")") ctx
 
-extend-CC-aux ctx t@(apᵖ f p) with split f | p
+extend-CC-aux ctx t@(apᵖ f p) with reduce-ap f p
+... | just sq =
+  extend-CC-with t sq ctx
+... | nothing =
+  trerror ("extend-CC 0 " ++ print t) ctx
 
-... | Idf | Glue _ _ _ _ =
-  extend-CC-with (ap f p) (ap-idf p) ctx
+extend-CC-aux ctx t@(ap+ᵖ h@(Lam x X (apᵖ f p)) q) with reduce-ap f p | split (Lam x X p) | q
 
-... | Cst k | Glue _ _ _ _ =
-  extend-CC-with (ap f p) (ap-cst k p) ctx
+... | just sq | _ | _ =
+  extend-CC-with t (ap++ (Lam x X sq) q) ctx
 
-... | Projpt lr A B | Glue _ _ _ _ =
-  extend-CC-with (ap f p) (ap□ (glue A B lr) p) ctx
+... | nothing | Cst k | _ =
+  trerror ("TODOA " ++ print t) ctx
 
-... | SingleDec dec args | Glue lr A B ab =
-  extend-CC-with (ap f p) (glue-β dec args lr A B ab) ctx
+... | nothing | _ | apᵖ (Dec dec args) (Glue lr A B u) =
+  extend-CC-with t (ap²+ h (glue-β dec args lr A B u)) ctx
 
-... | InnerDec dec args g | Glue _ _ _ _ =
-  extend-CC-with (ap f p) (ap-∘ g (Dec dec args) p) ctx
+... | nothing | SingleDec dec args | Glue _ _ _ _ =
+  extend-CC-with t (ap+-∘1 f (eta-expand (Dec dec args)) q) ctx  --  (Lam x X (hids (ap f p)))
 
-... | _ | apᵖ g q with split g | q
+... | nothing | InnerDec dec args rest | Glue _ _ _ _ =
+  extend-CC-with t (ap+-∘3 f rest (Dec dec args) q) ctx
 
-...   | SingleDec dec args | Glue lr A B ab =
-  extend-CC-with (ap f p) (ap-square f (glue-β dec args lr A B ab)) ctx
-
-...   | Cst k | Glue _ _ _ _ =
-  extend-CC-with (ap f p) (ap-square f (ap-cst k q)) ctx
-
-...   | _ | _ =
-  extend-CC-with (ap f p) (ap-∘ f g q) ctx
-
-extend-CC-aux ctx t@(apᵖ f p) | _ | _ =
-  let Appp s ty args = unapp p in
-  if isCoh s then
-    extend-CC-with (ap f p) (apcohify s ty args f) ctx
-  else
-    trerror ("extend-CC 0 " ++ print (ap f p)) ctx
-
-extend-CC-aux ctx t@(ap□ᵖ h@(Lam x X (apᵖ f p)) (apᵖ g q)) with split g | q
-
-... | SingleDec dec args | Glue lr A B u =
-  extend-CC-with t (ap□+ h (glue-β dec args lr A B u)) ctx
-
-... | _ | _ =
-  trerror ("TODO Y " ++ print t) ctx
-
-extend-CC-aux ctx t@(ap□ᵖ (Lam x X (apᵖ f p)) q) with split f | p
-
-... | Idf | Glue _ _ _ _ =
-  extend-CC-with t (ap□-= (Lam x X (ap-idf p)) q) ctx
-
-... | Cst k | Glue _ _ _ _ =
-  extend-CC-with t (ap□-= (Lam x X (ap-cst k p)) q) ctx
-
-... | SingleDec dec args | Glue lr A B ab =
-  extend-CC-with t (ap□-= (Lam x X (glue-β dec args lr A B ab)) q) ctx
-
-... | InnerDec dec args g | Glue _ _ _ _ =
-  extend-CC-with t (ap□-= (Lam x X (ap-∘ g (Dec dec args) p)) q) ctx
-
-... | _ | apᵖ g r with split g | r
-
-...   | SingleDec dec args | Glue lr A B ab =
-  extend-CC-with t (ap□-= (Lam x X (ap-square f (glue-β dec args lr A B ab))) q) ctx
-
-...   | Cst k | Glue _ _ _ _ =
-  extend-CC-with t (ap□-= (Lam x X (ap-cst k r)) q) ctx
-
-...   | _ | _ =
-  extend-CC-with t (ap□-= (Lam x X (ap-∘ f g r)) q) ctx
-
-extend-CC-aux ctx t@(ap□ᵖ h@(Lam x X (apᵖ f p)) q) | _ | _ with split (Lam x X p) | q
-
-...   | Cst k | Glue _ _ _ _ =
-  extend-CC-with t (ap□-cst (ap f p) q) ctx
-
-...   | SingleDec dec args | Glue _ _ _ _ =
-  extend-CC-with t (ap□-∘-eq (eta-expand (Dec dec args)) f q (Lam x X (hids (ap f p)))) ctx
-
-...   | InnerDec dec args rest | Glue _ _ _ _ =
-  extend-CC-with t (ap□-∘3 f rest (Dec dec args) q) ctx
-
-...   | SCoh _ _ s ty args | Glue _ _ _ _ =
-  extend-CC-with t (ap□-= (Lam x X (apcohify s ty args f)) q) ctx
-
-...   | _ | _ =
+... | nothing | _ | _ =
   let Appp s ty args = unapp q in
   if isCoh s then
-    extend-CC-with t (ap□cohify s ty args h) ctx
+    extend-CC-with t (ap+cohify s ty args h) ctx
   else
     trerror ("extend-CC 00 " ++ print t) ctx
 
-extend-CC-aux ctx t@(ap□ᵖ f p) with split f | p
-... | Cst k | Glue _ _ _ _ =
-  extend-CC-with (ap□ f p) (ap□-cst k p) ctx
+extend-CC-aux ctx t@(ap+ᵖ f p) with split f | p
+... | Cst k | _ =
+  extend-CC-with (ap+ f p) (ap+-cst k p) ctx
 
 ... | SingleDec dec args | Glue lr A B u =
-  extend-CC-with (ap□ f p) (glue-β□ dec args lr A B u) ctx
+  extend-CC-with (ap+ f p) (glue-β□ dec args lr A B u) ctx
 
 ... | InnerDec dec args rest | Glue _ _ _ _ =
-  extend-CC-with t (ap□-∘2 rest (eta-expand (Dec dec args)) p) ctx
+  extend-CC-with t (ap+-∘2 rest (Dec dec args) p) ctx
 
 ... | SCoh x X s ty args | _ =
-  extend-CC-with (ap□ f p) (ap/cohify s ty p x X args) ctx
+  extend-CC-with (ap+ f p) (ap/cohify s ty p x X args) ctx
 
 ... | SIdp x X u | _ =
-  extend-CC-with (ap□ f p) (ap□-idp (Lam x X u) p) ctx
+  extend-CC-with (ap+ f p) (ap+-idp (Lam x X u) p) ctx
 
 ... | _ | apᵖ (Dec dec args) (Glue lr A B u) =
-  extend-CC-with t (ap□+ f (glue-β dec args lr A B u)) ctx
-
-... | _ | apᵖ (Lam _ _ (App (Dec dec args) (Var _ _))) (Glue lr A B u) =
-  extend-CC-with t (ap□+ f (glue-β dec args lr A B u)) ctx
+  extend-CC-with t (ap²+ f (glue-β dec args lr A B u)) ctx
 
 ... | _ | _ =
   let Appp s ty args = unapp p in
   if isCoh s then
-    extend-CC-with t (ap□cohify s ty args f) ctx
+    extend-CC-with t (ap+cohify s ty args f) ctx
   else
     trerror ("extend-CC 6 " ++ print t) ctx
 
 extend-CC-aux ctx t@(ap-∘ᵖ f g p) with split f | split g
--- -- ... | Idf | _ =
--- --        extend-CC-with (ap-∘ f g p) (ap-∘-idfl g p) ctx
-
-... | _ | Cst b =
-       extend-CC-with (ap-∘ f g p) (ap-∘-cst f b p) ctx
-
--- ... | Cst a | _ =
---        extend-CC-with (ap-∘ f g p) (ap-∘-cst2 a g p) ctx
-
--- -- {- Debatable -}
--- -- ... | _ | apᵖ h q =
--- --   extend-CC-with (ap-∘ f g p) (ap-∘3 f g h q) ctx
+... | Cst a | _ =
+       extend-CC-with (ap-∘ f g p) (ap-∘-cst2 a g p) ctx
 
 ... | _ | _ =
   trerror ("extend-CC 23 " ++ print t) ctx
-
--- -- extend-CC-aux ctx t@(ap-squareᵖ f (ap□ g@(Lam x X (apᵖ h q)) p@(Glue lr _ _ _))) =
--- --   extend-CC-with t (ap-cube f (ap□-∘-eq (Lam x X q) h p (Lam x X (hids (ap h q))))) ctx
-
--- {- Debatable -}
--- extend-CC-aux ctx (ap-cst k (apᵖ f p)) =
   
 
-extend-CC-aux ctx t@(ap-squareᵖ f (ap-∘ᵖ g h p)) with split g | split h
-
-... | _ | Cst b =
-  extend-CC-with t (ap-cube f (ap-∘-cst g b p)) ctx
-
-... | Cst a | _ =
-  extend-CC-with t (ap-cube f (ap-∘-cst2 a h p)) ctx
-
-... | _ | _ =
+extend-CC-aux ctx t@(ap²ᵖ f (ap-∘ᵖ g h p)) =
   extend-CC-with t (ap-∘3 f g h p) ctx
 
-extend-CC-aux ctx t@(ap-squareᵖ f sq) with split f | sq
+extend-CC-aux ctx t@(ap²ᵖ f (ap-cstᵖ b p)) =
+  extend-CC-with t (ap-∘-cst f b p) ctx
 
-... | _ | ap□ᵖ (Dec dec args) (Glue lr A B u) =
-  extend-CC-with t (ap-cube f (glue-β□ dec args lr A B u)) ctx
+extend-CC-aux ctx t@(ap²ᵖ f sq) with split f | sq
 
--- {- Debatable -}
--- ... | _ | ap-cst b p =
---   extend-CC-with (ap-square f sq) (ap-∘-cst f b p) ctx
+... | Cst k | _ =
+  extend-CC-with t (ap²-cst k sq) ctx
 
--- ... | Cst _ | _ =
---   trerror ("TODO5 " ++ print t) ctx
+... | _ | ap+ᵖ (Dec dec args) (Glue lr A B u) =
+  extend-CC-with t (ap³ f (glue-β□ dec args lr A B u)) ctx
 
--- ... | Idf | _ =
---   extend-CC-with (ap-square f sq) (ap-square-idf sq) ctx
+... | SingleDec dec args | ap+ᵖ g@(Lam x X (Glue lr A B u)) p =
+  extend-CC-with (ap² f sq) (ap+-∘1 (Dec dec args) g p) ctx  --  (Lam x X (glue-β dec args lr A B u))
 
-... | SingleDec dec args | ap□ᵖ g@(Lam x X (Glue lr A B u)) p =
-  extend-CC-with (ap-square f sq) (ap□-∘-eq g (Dec dec args) p (Lam x X (glue-β dec args lr A B u))) ctx
+... | InnerDec dec args rest | ap+ᵖ (Lam _ _ (Glue _ _ _ _)) p =
+  extend-CC-with (ap² f sq) (ap²-∘ rest (Dec dec args) sq) ctx
 
-... | InnerDec dec args rest | ap□ᵖ (Lam _ _ (Glue _ _ _ _)) p =
-  extend-CC-with (ap-square f sq) (ap-square-∘ rest (Dec dec args) sq) ctx
-
-... | _ | ap□ᵖ g (apᵖ (Dec dec args) (Glue lr A B u)) =
-  extend-CC-with t (ap-cube f (ap□+ (eta-expand g) (glue-β dec args lr A B u))) ctx
-
-... | _ | ap-squareᵖ (Dec dec args) (ap□ᵖ g@(Lam x X (Glue lr A B u)) p) =
-  extend-CC-with t (ap-cube f (ap□-∘-eq g (Dec dec args) p (Lam x X (glue-β dec args lr A B u)))) ctx
-
-... | _ | ap□ᵖ g p =
+... | _ | ap+ᵖ g p =
   let X = get-domain (get-type g) in
   let x = fresh (X ∷ f ∷ g ∷ []) "x" in
-  extend-CC-with t (ap□-∘-eq g f p (Lam x X (hids (ap f (AppReduce g (Var x X)))))) ctx
+  extend-CC-with t (ap+-∘1 f (eta-expand g) p) ctx  --  (Lam x X (hids (ap f (AppReduce g (Var x X)))))
 
--- extend-CC-aux ctx t@(ap-squareᵖ f sq)
---     | _ | ap-squareᵖ g sq' with split g | sq'
+... | _ | ap²ᵖ (Dec dec args) (ap+ᵖ h@(Lam x X(Glue lr A B u)) p) =
+  extend-CC-with t (ap³ f (ap+-∘1 (Dec dec args) h p)) ctx --  (Lam x X (glue-β dec args lr A B u))
 
--- -- {- Debatable -}
--- -- ...   | _ | ap-cst b p =
--- --   extend-CC-with (ap-square f sq) (ap-cube f (ap-∘-cst g b p)) ctx
-
--- ...   | SingleDec dec args | ap□ᵖ h@(Lam x X (Glue lr A B u)) p =
---   extend-CC-with (ap-square f sq) (ap-cube f (ap□-∘-eq h g p (Lam x X (glue-β dec args lr A B u)))) ctx
-
--- -- ...     | SingleDec dec' args' | Glue lr A B ab =
--- --   extend-CC-with (ap-square f sq) (ap-cube f (ap-cube g (glue-β□ dec' args' lr A B ab))) ctx
-
--- -- ...     | SCoh x X s ty' args' | _ =
-
--- -- extend-CC-aux ctx t@(ap-squareᵖ f sq) | _ | ap-squareᵖ g sq' | _ | ap-squareᵖ h sq'' with split h | sq''
-
--- -- ...     | SingleDec dec args | ap□ k p with split k | p
-
--- -- ...       | SGlue lr x X A B u | _ =
--- --   extend-CC-with (ap-square f sq) (ap-cube f (ap-cube g (ap□-∘-eq k h p (Lam x X (glue-β dec args lr A B u))))) ctx
-
--- -- ...       | _ | _ =
--- --   trerror ("TODO7 " ++ print t) ctx
-
--- -- extend-CC-aux ctx t@(ap-squareᵖ f sq) | _ | ap-squareᵖ g sq' | _ | ap-squareᵖ h sq'' | _ | _ =
--- --   trerror ("TODO8 " ++ print t) ctx
-
--- ...   | _ | _ =
---   extend-CC-with (ap-square f sq) (ap-square-∘ f g sq') ctx
---   -- let Appp s ty args = unapp sq' in
---   -- if isCoh s then
---   --   extend-CC-with (ap-square f sq) (ap-cube f (apcohify s ty args g)) ctx
---   -- else
---   --   trerror ("TODO9 " ++ print t) ctx
-
-
--- {- Debatable -}
--- extend-CC-aux ctx t@(ap-squareᵖ f sq) | _ | ap-∘ᵖ g h p with split g
-
--- ...       | Cst c = extend-CC-with (ap-square f sq) (ap-∘3-cst f c h p) ctx
-
--- ...       | _ = extend-CC-with (ap-square f sq) (ap-∘3 f g h p) ctx
-
--- extend-CC-aux ctx t@(ap-squareᵖ f sq) | _ | ap□ᵖ g p with split g | p
-
--- ... | Cst k | _ =
---   extend-CC-with t (ap-cube f (ap□-cst k p)) ctx
-
--- ... | SingleDec dec args | Glue lr A B u =
---   extend-CC-with t (ap-cube f (glue-β□ dec args lr A B u)) ctx
-
--- ... | InnerDec dec args rest | Glue _ _ _ _ =
---   extend-CC-with t (ap-cube f (ap□-∘2 rest (Dec dec args) p)) ctx
-
--- ... | SCoh x X s ty args | _ =
---   extend-CC-with t (ap□-∘-eq g f p (Lam x X (apcohify s ty args f))) ctx
-
--- ... | _ | apᵖ (Dec dec args) (Glue lr A B u) =
---   extend-CC-with t (ap-cube f (ap□+ g (glue-β dec args lr A B u))) ctx
-
--- ... | _ | _ =
---   let Appp s ty args = unapp p in
---   if isCoh s then
---     extend-CC-with t (ap-cube f (ap□cohify s ty args g)) ctx 
---   else
---     trerror ("TODO X " ++ print t) ctx
-
-extend-CC-aux ctx t@(ap-squareᵖ f sq) | _ | _ =
+extend-CC-aux ctx t@(ap²ᵖ f sq) | _ | _ =
   let Appp s ty args = unapp sq in
   if isCoh s then
-    extend-CC-with (ap-square f sq) (apcohify s ty args f) ctx
+    extend-CC-with (ap² f sq) (apcohify s ty args f) ctx
   else
     trerror ("extend-CC 8 " ++ print t) ctx
-
--- extend-CC-aux ctx t@(ap-cst b (ap g p) q) =
 
 extend-CC-aux ctx t@(App f arg) =
   let Appp s ty args = unapp t in
@@ -1573,6 +1516,9 @@ extend-CC-aux ctx t@(App f arg) =
     extendx-CC ctx (map unArg (tail args))
   else if is-pt arg then
     extend-CC-with t (ptf f) ctx
+  else if isCstApCoh s args then (
+    let (news , newty , newargs , y) = uncstapcoh s ty args in
+    extend-CC-with t (apcohcstify news newty newargs y) ctx)
   else
    trerror ("extend-CC 3 " ++ print t) ctx
 
@@ -1600,6 +1546,7 @@ asubst l (Idp a) = Idp (antisubst l a)
 asubst l (Square p q r s) = Square (antisubst l p) (antisubst l q) (antisubst l r) (antisubst l s)
 asubst l (Ids a) = Ids (antisubst l a)
 asubst l (Cube p q r s t u) = Cube (antisubst l p) (antisubst l q) (antisubst l r) (antisubst l s) (antisubst l t) (antisubst l u)
+asubst l (HyperCube p q r s t u v w) = HyperCube (antisubst l p) (antisubst l q) (antisubst l r) (antisubst l s) (antisubst l t) (antisubst l u) (antisubst l v) (antisubst l w)
 asubst l (Idc a) = Idc (antisubst l a)
 asubst l t@(App _ _) with unapp t
 ... | Appp s ty args with toList s
@@ -1667,7 +1614,7 @@ apcohtype s ty with is-only-Id ty
   just (Pi[] ((Imp "X", Type) ∷ (Imp "Y", Type) ∷ (Exp "f", Pi "_" Xₜ Yₜ) ∷ tail args) type)
 ... | false with is-only-Id-or-Square ty | unPi ty
 ...    | true | (args , Square p q r ss) =
-  let type = Cube (ap-square fₜX→Y (App[] (Var s ty) (vars args)))
+  let type = Cube (ap² fₜX→Y (App[] (Var s ty) (vars args)))
                   (App[] (Var s ty) (mapArg adhoc (vars args)))
                   (adhoc3 p) (adhoc3 q) (adhoc3 r) (adhoc3 ss) in
                   
@@ -1767,22 +1714,67 @@ generate-coh□ (Coh (coherence s ty)) with coh□type ("& " ++ s) ty
 generate-coh□ _ = trerror "generate-coh□" []
 
 
-ap/cohtype : String → Term → Maybe Term
+apcohcsttype : String → Term → Maybe Term
+apcohcsttype s ty with is-only-Id ty
+... | true =
+  let (args , T) = unPi ty in
+  let newargs = (Imp "X", Type) ∷ (Imp "Y", Type) ∷ (Exp "y", Yₜ) ∷ tail args in
+  let args□ = process-args args in
+  let newT = Cube (apcohify s ty (vars args) (Lam "_" Xₜ yₜY))
+                  (Ids yₜY)
+                  (ap-cst yₜY (cohify s ty (vars args)))
+                  (coh□ify s ty args□)
+                  (Ids yₜY)
+                  (Ids yₜY) in
+  just (Pi[] newargs newT)  where
+    process-args : List (Arg String × Term) → List (Arg Term)
+    process-args ((X , Type) ∷ (a , Xₜ) ∷ args) =
+      Exp Yₜ ∷ Imp yₜY ∷ Imp yₜY ∷ Imp (Idp yₜY) ∷ process-args args
+    process-args ((x , Xₜ) ∷ (p , Id (Var y Xₜ) (Var z Xₜ)) ∷ args) =
+      let p' = Var (unArg p) (Id (Var y Xₜ) (Var z Xₜ)) in
+      Imp yₜY ∷ Imp (ap (Lam "_" Xₜ yₜY) p') ∷ Imp yₜY ∷ Imp (Idp yₜY) ∷ Imp (Idp yₜY)
+              ∷ hiding-app p (ap-cst yₜY p')
+              ∷ process-args args
+    process-args [] = []
+    process-args _ = trerror "process-args" []
+
+... | false = nothing
+
+apcohcstify s ty args y with apcohcsttype s ty
+... | just aptycst = App[] (Var ("& ap" ++ trim& s ++ "-cst") aptycst) (head args ∷ Imp (get-type y) ∷ Exp y ∷ tail args)
+... | nothing = Error "apcohcstify"
+
+generate-apcohcst : Definition → List Definition
+generate-apcohcst (Coh (coherence s ty)) with apcohcsttype ("& " ++ s) ty
+... | just aptycst = [ Coh (coherence ("ap" ++ s ++ "-cst") aptycst) ]
+... | nothing = []
+generate-apcohcst _ = trerror "generate-apcohcst" []
+
+
+
+ap/cohtype : String → Term → Maybe (Term × Term)
 ap/cohtype s ty with is-only-Id ty
 ... | true =
   let (args , T) = unPi ty in
   let newargs = (Imp "X" , Type) ∷ (Imp "Y" , Type) ∷ (Imp "y", Xₜ) ∷ (Imp "z", Xₜ) ∷ (Exp "r", Id yₜX zₜX) ∷ map functionify (tail args) in
   let args□ = process-args args in
-  let squareleft = ap□ (Lam "x" Xₜ (cohify s ty (map (applyto xₜX) args))) (Var "r" (Id yₜX zₜX)) in
+  let squareleft = ap+ (Lam "x" Xₜ (cohify s ty (map (applyto xₜX) args))) (Var "r" (Id yₜX zₜX)) in
   let squareright = coh□ify s ty args□ in
   let newT = Cube squareleft squareright (hids (first-side (get-type squareleft))) (hids (second-side (get-type squareleft))) (hids (third-side (get-type squareleft))) (hids (fourth-side (get-type squareleft))) in
-  just (Pi[] newargs newT)
+  let T-lemma = Cube (hids (cohify s ty (vars args))) (coh□ify s ty (map hidsify args)) (hids (cohify s ty (vars args))) (hids (cohify s ty (vars args))) (Ids (Var "a" Xₜ)) (Ids (Var "a" Xₜ)) in
+  just (Pi[] newargs newT , Pi[] args T-lemma)
   where
 
     functionify : Arg String × Term → Arg String × Term
     functionify (x , Xₜ) = (x , X→Yₜ)
     functionify (p , Id (Var y Xₜ) (Var z Xₜ)) = (p , Pi "x" Xₜ (Id (AppReduce (Var y X→Yₜ) xₜX) (AppReduce (Var z X→Yₜ) xₜX)))
     functionify _ = (Exp "Error functionify", Error "functionify")
+
+    hidsify : Arg String × Term → Arg Term
+    hidsify (X , Type) = hiding-app X (Var (unArg X) Type)
+    hidsify (x , Xₜ) = hiding-app x (Idp (Var (unArg x) Xₜ))
+    hidsify (p , Id (Var y Xₜ) (Var z Xₜ)) = hiding-app p (hids (Var (unArg p) (Id (Var y Xₜ) (Var z Xₜ))))
+    hidsify _ = Exp (Error "hidsify")
 
     applyto : Term → Arg String × Term → Arg Term
     applyto a (X , Type) = hiding-app X Yₜ
@@ -1797,19 +1789,29 @@ ap/cohtype s ty with is-only-Id ty
       let x' = Var (unArg x) X→Yₜ in
       let p' = Var (unArg p) (Pi "x" Xₜ (Id (AppReduce (Var y X→Yₜ) xₜX) (AppReduce (Var z X→Yₜ) xₜX))) in
       let r = Var "r" (Id yₜX zₜX) in
-      Imp (AppReduce x' yₜX) ∷ Imp (AppReduce p' yₜX) ∷ Imp (AppReduce x' zₜX) ∷ Imp (AppReduce p' zₜX) ∷ hiding-app x (ap x' r) ∷ hiding-app p (ap□ p' r) ∷ process-args args
+      Imp (AppReduce x' yₜX) ∷ Imp (AppReduce p' yₜX) ∷ Imp (AppReduce x' zₜX) ∷ Imp (AppReduce p' zₜX) ∷ hiding-app x (ap x' r) ∷ hiding-app p (ap+ p' r) ∷ process-args args
     process-args [] = []
     process-args _ = trerror "process-args" []
 
 ... | false = nothing
 
 ap/cohify s ty p y Y args with ap/cohtype s ty
-... | just ap/ty = App[] (Var ("ap/" ++ trim& s) ap/ty) (Imp Y ∷ Imp (unArg (head args)) ∷ Imp (lhs (get-type p)) ∷ Imp (rhs (get-type p)) ∷ Exp p ∷ mapArg (Lam y Y) (tail args))
+... | just (ap/ty , _) = App[] (Var ("ap/" ++ trim& s) ap/ty) (Imp Y ∷ Imp (unArg (head args)) ∷ Imp (lhs (get-type p)) ∷ Imp (rhs (get-type p)) ∷ Exp p ∷ mapArg (Lam y Y) (tail args))
 ... | nothing = Error "ap/cohify"
 
 generate-ap/coh : Definition → List Definition
 generate-ap/coh (Coh (coherence s ty)) with ap/cohtype ("& " ++ s) ty
-... | just ap/ty = [ Oth (other ("ap/" ++ s) ap/ty " = ?") ]
+... | just (ap/ty , ap/ty-lemma) =
+  let (args , T) = unPi ty in
+  let name = "ap/" ++ s in
+  let def1 = name ++ " {Y = Y} {y = y} idp" in
+  let def2 = foldr (λ {(Exp s , _) → λ k → " " ++ s ++ k; (Imp s , _) → λ k → k}) "" (tail args) in
+  let def3 = " = & " ++ name ++ "-lemma Y" in
+  let def4 = foldr (λ {(Exp s , _) → λ k → " (" ++ s ++ " y)" ++ k; (Imp s , _) → λ k → k}) "" (tail args) in
+  let def5 = "  where\n" in
+  let def6 = "  " ++ name ++ "-lemma : Coh(" ++ print-term ap/ty-lemma ++ ")\n" in
+  let def7 = "  " ++ name ++ "-lemma = path-induction" in
+  [ Oth (other name ap/ty (def1 ++ def2 ++ def3 ++ def4 ++ def5 ++ def6 ++ def7)) ]
 ... | nothing = []
 generate-ap/coh _ = trerror "generate-ap/coh" []
 
@@ -1878,8 +1880,8 @@ generate-coh□' (Coh (coherence s ty)) with coh□'type ("& " ++ s) ty
 generate-coh□' _ = trerror "generate-coh□'" []
 
 
-ap□cohtype : String → Term → Maybe Term
-ap□cohtype s ty with is-only-Id ty
+ap+cohtype : String → Term → Maybe Term
+ap+cohtype s ty with is-only-Id ty
 ... | true =
   let (args , T) = unPi ty in
   let newargs = (Imp "X", Type) ∷ (Imp "Y", Type) ∷ (Imp "f", X→Yₜ) ∷ (Imp "g", X→Yₜ) ∷ (Exp "α", (Pi "x" Xₜ (Id (App (Var "f" X→Yₜ) xₜX) (App (Var "g" X→Yₜ) xₜX)))) ∷ tail args in
@@ -1889,7 +1891,7 @@ ap□cohtype s ty with is-only-Id ty
   let a = lhs T in
   let b = rhs T in
   let args□ = process-args f g α args in
-  let newT = Cube (ap□ α (cohify s ty (vars args)))
+  let newT = Cube (ap+ α (cohify s ty (vars args)))
                   (coh□'ify s ty args□)
                   (hids (App α a))
                   (hids (App α b))
@@ -1903,25 +1905,35 @@ ap□cohtype s ty with is-only-Id ty
     process-args f g α ((x , Xₜ) ∷ (p , pT@(Id (Var y Xₜ) (Var z Xₜ))) ∷ args) =
       let x' = Var (unArg x) Xₜ in
       let p' = Var (unArg p) pT in
-      Imp (AppReduce f x') ∷ Imp (ap f p') ∷ Imp (AppReduce g x') ∷ Imp (ap g p') ∷ hiding-app x (AppReduce α x') ∷ hiding-app p (ap□ α p') ∷ process-args f g α args
+      Imp (AppReduce f x') ∷ Imp (ap f p') ∷ Imp (AppReduce g x') ∷ Imp (ap g p') ∷ hiding-app x (AppReduce α x') ∷ hiding-app p (ap+ α p') ∷ process-args f g α args
     process-args f g α [] = []
     process-args f g α _ = trerror "process-args" []
 
 ... | false = nothing
 
-ap□cohify s ty args α with α | ap□cohtype s ty
-... | Lam x X α-in | just ap□ty =
+ap+cohify s ty args α with α | ap+cohtype s ty
+... | Lam x X α-in | just ap+ty =
   let f = Lam x X (lhs (get-type α-in)) in
   let g = Lam x X (rhs (get-type α-in)) in
   let Y = get-codomain (get-type f) in
-  App[] (Var ("ap□" ++ trim& s) ap□ty) (Imp X ∷ Imp Y ∷ Imp f ∷ Imp g ∷ Exp α ∷ tail args)
-... | _ | _ = Error "ap□cohify"
+  App[] (Var ("ap+" ++ trim& s) ap+ty) (Imp X ∷ Imp Y ∷ Imp f ∷ Imp g ∷ Exp α ∷ tail args)
+... | _ | _ = Error "ap+cohify"
 
-generate-ap□coh : Definition → List Definition
-generate-ap□coh (Coh (coherence s ty)) with ap□cohtype ("& " ++ s) ty
-... | just ap□ty = [ Oth (other ("ap□" ++ s) ap□ty " = ?") ]
+generate-ap+coh : Definition → List Definition
+generate-ap+coh (Coh (coherence s ty)) with ap+cohtype ("& " ++ s) ty
+... | just ap+ty =
+  let (args , T) = unPi ty in
+  let name = "ap+" ++ s in
+  let def1 = name ++ " α {a = a}" in
+  let def2 = foldr (λ {(Exp _ , _) → λ k → " idp" ++ k; (Imp _ , _) → λ k → k}) "" (tail args) in
+  let def3 = " = " ++ name ++ "-lemma (α a)  where\n" in
+  let def4 = "  " ++ name ++ "-lemma : {X : Type i} {a b : X} (p : a == b) → " in
+  let thing = "(& " ++ s ++ "□' X" ++ foldr (λ {(Exp _ , _) → λ k → " (& hids p)" ++ k; (Imp _ , _) → λ k → k}) "" (tail args) ++ ")" in
+  let def5 = "Cube (& hids p) " ++ thing ++ " (& hids p) (& hids p) ids ids\n" in
+  let def6 = "  " ++ name ++ "-lemma idp = idc" in
+  [ Oth (other name ap+ty (def1 ++ def2 ++ def3 ++ def4 ++ def5 ++ def6)) ]
 ... | nothing = []
-generate-ap□coh _ = trerror "generate-ap□coh" []
+generate-ap+coh _ = trerror "generate-ap+coh" []
 
 
 implicitify : List (Arg String × Term × Term) → List (Arg String × Term × Term) → List (Arg String × Term × Term)
@@ -1939,6 +1951,7 @@ implicitify (k@(Exp s , t , u) ∷ ts) acc = implicitify ts ((if occurs-fully s 
   occurs-fully s ((_ , _ , Id a b) ∷ ts) = is-one-of (a ∷ b ∷ []) s ∨ occurs-fully s ts
   occurs-fully s ((_ , _ , Square p q r ss) ∷ ts) = is-one-of (p ∷ q ∷ r ∷ ss ∷ []) s ∨ occurs-fully s ts
   occurs-fully s ((_ , _ , Cube p q r ss t u) ∷ ts) = is-one-of (p ∷ q ∷ r ∷ ss ∷ t ∷ u ∷ []) s ∨ occurs-fully s ts
+  occurs-fully s ((_ , _ , HyperCube p q r ss t u v w) ∷ ts) = is-one-of (p ∷ q ∷ r ∷ ss ∷ t ∷ u ∷ v ∷ w ∷ []) s ∨ occurs-fully s ts
   occurs-fully s ((_ , _ , Var "X" _) ∷ ts) = occurs-fully s ts
   occurs-fully s ((_ , _ , Type) ∷ ts) = false
   occurs-fully s ((_ , _ , t) ∷ ts) = trerror ("occurs-fully " ++ print-P t) (occurs-fully s ts)
@@ -1949,8 +1962,8 @@ generate-coh s t =
   let root = get-root-type t in
   let ct-big = contractibilify root args in
   let type = antisubst ct-big t in
---  let ct = reverse ct-big in
-  let ct = implicitify ct-big [] in
+  let ct = reverse ct-big in
+--  let ct = implicitify ct-big [] in
   let cohtype = Pi[] (get-params ct) type in
   let appterm = App[] (Var ("& " ++ s) cohtype) (get-args ct) in
   let coh = Coh (coherence s cohtype) in
@@ -1960,7 +1973,7 @@ generate-coh s t =
   else if type ==ₜ proj3 (last ct) then
     D&T [] (proj2 (last ct))
   else
-    D&T (coh ∷ generate-apcoh coh ++ₗ generate-coh□ coh ++ₗ generate-ap/coh coh ++ₗ generate-coh□' coh ++ₗ generate-ap□coh coh) appterm
+    D&T (coh ∷ generate-apcoh coh ++ₗ generate-coh□ coh ++ₗ generate-ap/coh coh ++ₗ generate-coh□' coh ++ₗ generate-ap+coh coh ++ₗ generate-apcohcst coh) appterm
 
     where
   
@@ -2001,21 +2014,25 @@ to-str R = "r"
 
 get-coh-base : SparseDeclaration → Term → Term → LR → DefinitionsAndTerm
 get-coh-base dec A B lr =
-  generate-coh (name dec ++ "-cohb" ++ to-str lr)
+  generate-coh (name dec ++ "-base" ++ to-str lr)
                (type dec [ Base lr A B / "x" ])
 
 get-coh-0-A∧B : SparseDeclaration → Term → Term → String → String → LR → DefinitionsAndTerm
 get-coh-0-A∧B dec A B a b lr =
-  generate-coh (name dec ++ "-coh" ++ to-str lr)
+  generate-coh (name dec ++ "-glue" ++ to-str lr)
                (Id (def dec [ choose lr (pt B) (pt A) / choose lr b a ]) (pt (type dec)))
 
 get-coh-1-A∧B : SparseDeclaration → Term → Term → String → String → Term → LR → DefinitionsAndTerm
-get-coh-1-A∧B dec A B a b cohapp lr =
+get-coh-1-A∧B dec A B a b cohapp lr with type dec
+... | Id ad bd =
+  let p = def dec [ choose lr (pt B) (pt A) / choose lr b a ] in
+  let q = cohapp in
   let var = choose lr (Var a A) (Var b B) in
-  let side1 = ap (Lam "x" (Smash A B) (lhs (type dec))) (Glue lr A B var) in
-  let side2 = ap (Lam "x" (Smash A B) (rhs (type dec))) (Glue lr A B var) in
-  generate-coh (name dec ++ "-coh" ++ to-str lr)
-               (Square (def dec [ choose lr (pt B) (pt A) / choose lr b a ]) cohapp side1 side2)
+  let r = ap (Lam "x" (Smash A B) ad) (Glue lr A B var) in
+  let s = ap (Lam "x" (Smash A B) bd) (Glue lr A B var) in
+  generate-coh (name dec ++ "-glue" ++ to-str lr)
+               (Square p q r s)
+... | _ = D&T [] (Error "get-coh-1-A∧B")
 
 get-coh-2-A∧B : SparseDeclaration → Term → Term → String → String → Term → LR → DefinitionsAndTerm
 get-coh-2-A∧B dec A B a b cohapp lr with type dec
@@ -2023,32 +2040,48 @@ get-coh-2-A∧B dec A B a b cohapp lr with type dec
   let p = def dec [ choose lr (pt B) (pt A) / choose lr b a ] in
   let q = cohapp in
   let var = choose lr (Var a A) (Var b B) in
-  let r = ap□ (Lam "x" (Smash A B) pd) (Glue lr A B var) in
-  let s = ap□ (Lam "x" (Smash A B) qd) (Glue lr A B var) in
-  let t = ap□ (Lam "x" (Smash A B) rd) (Glue lr A B var) in
-  let u = ap□ (Lam "x" (Smash A B) sd) (Glue lr A B var) in
-  generate-coh (name dec ++ "-cohg" ++ to-str lr)
+  let r = ap+ (Lam "x" (Smash A B) pd) (Glue lr A B var) in
+  let s = ap+ (Lam "x" (Smash A B) qd) (Glue lr A B var) in
+  let t = ap+ (Lam "x" (Smash A B) rd) (Glue lr A B var) in
+  let u = ap+ (Lam "x" (Smash A B) sd) (Glue lr A B var) in
+  generate-coh (name dec ++ "-glue" ++ to-str lr)
                (Cube p q r s t u)
 ... | _ = D&T [] (Error "get-coh-2-A∧B")
 
-get-coh1-0-X∧C : SparseDeclaration → Term → String → DefinitionsAndTerm
-get-coh1-0-X∧C dec C c = 
-  generate-coh (name dec ++ "-coh1")
-               (Id (def dec [ pt C / c ]) (pt (type dec)))
+get-coh-3-A∧B : SparseDeclaration → Term → Term → String → String → Term → LR → DefinitionsAndTerm
+get-coh-3-A∧B dec A B a b cohapp lr with type dec
+... | Cube pd qd rd sd td ud =
+  let p = def dec [ choose lr (pt B) (pt A) / choose lr b a ] in
+  let q = cohapp in
+  let var = choose lr (Var a A) (Var b B) in
+  let r = ap++ (Lam "x" (Smash A B) pd) (Glue lr A B var) in
+  let s = ap++ (Lam "x" (Smash A B) qd) (Glue lr A B var) in
+  let t = ap++ (Lam "x" (Smash A B) rd) (Glue lr A B var) in
+  let u = ap++ (Lam "x" (Smash A B) sd) (Glue lr A B var) in
+  let v = ap++ (Lam "x" (Smash A B) td) (Glue lr A B var) in
+  let w = ap++ (Lam "x" (Smash A B) ud) (Glue lr A B var) in
+  generate-coh (name dec ++ "-glue" ++ to-str lr)
+               (HyperCube p q r s t u v w)
+... | _ = D&T [] (Error "get-coh-3-A∧B")
 
 get-aux-0-X∧C : SparseDeclaration → ArgType → Term → String → DefinitionsAndTerm
 get-aux-0-X∧C dec X C c =
-  D&T-fill (name dec ++ "-aux")
+  D&T-fill (name dec ++ "-proj")
            (params dec ++ₗ [ c , C ])
            X
            (type dec)
            (def dec)
            []
 
+get-coh1-0-X∧C : SparseDeclaration → Term → String → DefinitionsAndTerm
+get-coh1-0-X∧C dec C c = 
+  generate-coh (name dec ++ "-gluel-proj")
+               (Id (def dec [ pt C / c ]) (pt (type dec)))
+
 get-auxcoh-0-X∧C : SparseDeclaration → DefinitionsAndTerm → ArgType → Term → String → DefinitionsAndTerm
 get-auxcoh-0-X∧C dec dec-aux X C c =
   let D&T coh1 coh1app = get-coh1-0-X∧C dec C c in
-  D&T-fill (name dec ++ "-auxcoh")
+  D&T-fill (name dec ++ "-gluel")
            (params dec)
            X
            (Id (AppReduce ((cohapp dec-aux) [ pt C / c ])
@@ -2059,12 +2092,12 @@ get-auxcoh-0-X∧C dec dec-aux X C c =
 
 get-coh2-0-X∧C : SparseDeclaration → ArgType → Term → String → DefinitionsAndTerm
 get-coh2-0-X∧C dec X C c =
-  generate-coh (name dec ++ "-coh2")
+  generate-coh (name dec ++ "-gluer")
                (Id (all-pt-subst X (def dec)) (pt (type dec)))
 
 get-aux-0-A∧X : SparseDeclaration → Term → ArgType → String → DefinitionsAndTerm
 get-aux-0-A∧X dec A X a =
-  D&T-fill (name dec ++ "-aux")
+  D&T-fill (name dec ++ "-proj")
            (params dec ++ₗ [ a , A ])
            X
            (type dec)
@@ -2073,13 +2106,13 @@ get-aux-0-A∧X dec A X a =
 
 get-coh1-0-A∧X : SparseDeclaration → Term → String → DefinitionsAndTerm
 get-coh1-0-A∧X dec A a =
-  generate-coh (name dec ++ "-coh1")
+  generate-coh (name dec ++ "-gluer-proj")
                (Id (def dec [ pt A / a ]) (pt (type dec)))
 
 get-auxcoh-0-A∧X : SparseDeclaration → DefinitionsAndTerm → Term → ArgType → String → DefinitionsAndTerm
 get-auxcoh-0-A∧X dec dec-aux A X a =
   let D&T coh1 coh1app = get-coh1-0-A∧X dec A a in
-  D&T-fill (name dec ++ "-auxcoh")
+  D&T-fill (name dec ++ "-gluer")
            (params dec)
            X
            (Id (AppReduce (AppReduce (Lam a A (cohapp dec-aux)) (pt A))
@@ -2090,12 +2123,12 @@ get-auxcoh-0-A∧X dec dec-aux A X a =
 
 get-coh2-0-A∧X : SparseDeclaration → Term → ArgType → String → DefinitionsAndTerm
 get-coh2-0-A∧X dec A X a =
-  generate-coh (name dec ++ "-coh2")
+  generate-coh (name dec ++ "-gluel")
                (Id (all-pt-subst X (def dec)) (pt (type dec)))
 
 get-aux-1-X∧C : SparseDeclaration → ArgType → Term → String → DefinitionsAndTerm
 get-aux-1-X∧C dec X C c =
-  D&T-fill (name dec ++ "-aux")
+  D&T-fill (name dec ++ "-proj")
            (params dec ++ₗ [ c , C ])
            X
            (type dec [ Proj (Var "x" (argtype-to-type X)) (Var c C) / "x" ])
@@ -2108,9 +2141,9 @@ get-auxcoh-1-X∧C dec dec-aux X C c coh1app =
   let side1 = ap (Lam "x" (Smash Xt C) (lhs (type dec))) (GlueL Xt C (Var "x" Xt)) in
   let side2 = ap (Lam "x" (Smash Xt C) (rhs (type dec))) (GlueL Xt C (Var "x" Xt)) in
   let type = Square (AppReduce (cohapp dec-aux [ pt C / c ]) (Var "x" Xt)) coh1app side1 side2 in
-  let cohdef = generate-coh (name dec ++ "-cohdef")
+  let cohdef = generate-coh (name dec ++ "-gluel-proj")
                             (type [ all-proj X / "x" ]) in
-  D&T-fill (name dec ++ "-auxcoh")
+  D&T-fill (name dec ++ "-gluel")
            (params dec)
            X
            type
@@ -2125,12 +2158,12 @@ get-coh-gluer-1-X∧C dec def-coh X C c cohappb =
   let type = Square (AppReduce (cohapp def-coh) (pt Xt)) cohappb
                     side1 side2 in
 
-  generate-coh (name dec ++ "-coh3")
+  generate-coh (name dec ++ "-gluer")
                type
 
 get-aux-1-A∧X : SparseDeclaration → Term → ArgType → String → DefinitionsAndTerm
 get-aux-1-A∧X dec A X a =
-  D&T-fill (name dec ++ "-aux")
+  D&T-fill (name dec ++ "-proj")
            (params dec ++ₗ [ a , A ])
            X
            (type dec [ Proj (Var a A) (Var "x" (argtype-to-type X)) / "x" ])
@@ -2143,9 +2176,9 @@ get-auxcoh-1-A∧X dec dec-aux A X a coh1app =
   let side1 = ap (Lam "x" (Smash A Xt) (lhs (type dec))) (GlueR A Xt (Var "x" Xt)) in
   let side2 = ap (Lam "x" (Smash A Xt) (rhs (type dec))) (GlueR A Xt (Var "x" Xt)) in
   let type = Square (AppReduce (cohapp dec-aux [ pt A / a ]) (Var "x" Xt)) coh1app side1 side2 in
-  let cohdef = generate-coh (name dec ++ "-cohdef")
+  let cohdef = generate-coh (name dec ++ "-gluer-proj")
                             (type [ all-proj X / "x" ]) in
-  D&T-fill (name dec ++ "-auxcoh")
+  D&T-fill (name dec ++ "-gluer")
            (params dec)
            X
            type
@@ -2160,7 +2193,7 @@ get-coh-gluel-1-A∧X dec def-coh A X a cohappb =
   let type = Square (AppReduce (cohapp def-coh) (pt Xt)) cohappb
                     side1 side2 in
 
-  generate-coh (name dec ++ "-coh3")
+  generate-coh (name dec ++ "-gluel")
                type
 
 AppReduce (Lam s A t) u = t [ u / s ]
@@ -2170,13 +2203,14 @@ AppReduce (Dec dec args) (Base lr _ _) with dimension (type dec)
 ... | _ = Error "Not implemented (AppReduce)"
 AppReduce (Dec dec args) (Proj u v) with dimension (type dec) | argtype dec
 ... | _ | / a - A / [∧] / b - B / = cohapp (def-coh dec) [ u ∷ v ∷ args /[] a ∷ b ∷ map proj₁ (params dec) ]
-... | 0 | X [∧] / c - C / = AppReduce (cohapp (def-coh dec) [ v ∷ args /[] c ∷ map proj₁ (params dec) ]) u
-... | 0 | / a - A / [∧] X = AppReduce (cohapp (def-coh dec) [ u ∷ args /[] a ∷ map proj₁ (params dec) ]) v
+... | _ | X [∧] / c - C / = AppReduce (cohapp (def-coh dec) [ v ∷ args /[] c ∷ map proj₁ (params dec) ]) u
+... | _ | / a - A / [∧] X = AppReduce (cohapp (def-coh dec) [ u ∷ args /[] a ∷ map proj₁ (params dec) ]) v
 ... | _ | _ = Error ("TODO4(" ++ showℕ (dimension (type dec)) ++ ")")
 AppReduce (App (Atom "ap") f) (Idp u) = Idp (AppReduce f u)
-AppReduce (App (Atom "ap-square") f) (Ids u) = Ids (AppReduce f u)
-AppReduce (App (Atom "ap□") f) (Idp u) = hids (AppReduce f u)
+AppReduce (App (Atom "ap²") f) (Ids u) = Ids (AppReduce f u)
+AppReduce (App (Atom "ap+") f) (Idp u) = hids (AppReduce f u)
 AppReduce (App (App (Atom "ap-∘") f) g) (Idp u) = Ids (AppReduce f (AppReduce g u))
+AppReduce (App (Atom "ap-cst") k) (Idp u) = Ids k
 AppReduce (AppI (AppI (AppI (Var "& hids" _) _) _) _) (Idp u) = Ids u
 AppReduce (AppI (AppI (AppI (Var "& vids" _) _) _) _) (Idp u) = Ids u
 AppReduce t u = App t u
@@ -2223,6 +2257,13 @@ all-at-once dec with dimension (type dec) | argtype dec
 ... | 2 | / a - A / [∧] / b - B / =
   let base-coh = get-coh-base dec A B in
   let glue-coh = λ lr → get-coh-2-A∧B dec A B a b (cohapp (base-coh lr)) lr in
+  (D&T [] (def dec),
+   base-coh ,
+   glue-coh)
+
+... | 3 | / a - A / [∧] / b - B / =
+  let base-coh = get-coh-base dec A B in
+  let glue-coh = λ lr → get-coh-3-A∧B dec A B a b (cohapp (base-coh lr)) lr in
   (D&T [] (def dec),
    base-coh ,
    glue-coh)
@@ -2275,6 +2316,42 @@ fill-declaration dec =
               def-coh
               base-coh
               glue-coh
+
+
+-- generate-body dec =
+--   let D&T coh1 coh1app = def-coh dec in
+--   let D&T coh2 coh2app = base-coh dec L in
+--   let D&T coh3 coh3app = glue-coh dec L in
+--   let D&T coh4 coh4app = base-coh dec R in
+--   let D&T coh5 coh5app = glue-coh dec R in
+--   let M = name-and-params-module dec in
+--   sprintf "%k
+
+-- %k : %k %k → %k
+-- %k %k = %k.f  module _ where
+
+--   module %k =
+--     %k
+--       (λ %k %k → %k)
+--       %k
+--       (λ %k → %k)
+--       %k
+--       (λ %k → %k)
+
+-- " ((coh1 ++ₗ coh2 ++ₗ coh3 ++ₗ coh4 ++ₗ coh5)
+--   ∷ name dec ∷ params dec ∷ get-arg dec ∷ type dec
+--   ∷ name dec ∷ onlyNames (params dec) ∷ name dec
+--   ∷ name dec
+--   ∷ M
+--   ∷ lhs (type dec)
+--   ∷ rhs (type dec)
+--   ∷ a ∷ b ∷ coh1app
+--   ∷ coh2app
+--   ∷ a ∷ coh3app
+--   ∷ coh4app
+--   ∷ b ∷ coh5app
+--   ∷ [])
+  
 
 generate-body dec with dimension (type dec) | argtype dec
 generate-body dec | 0 | / a - A / [∧] / b - B / =
@@ -2354,6 +2431,32 @@ generate-body dec | 2 | / a - A / [∧] / b - B / =
              (λ %k → ↓-Square-in (%k))
              (%k)
              (λ %k → ↓-Square-in (%k))
+" (coh1 ∷ coh2 ∷ coh3 ∷ coh4 ∷ coh5
+  ∷ name dec ∷ params dec ∷ get-arg dec ∷ type dec
+  ∷ name dec ∷ onlyNames (params dec)
+  ∷ a ∷ b ∷ coh1app
+  ∷ coh2app
+  ∷ a ∷ coh3app
+  ∷ coh4app
+  ∷ b ∷ coh5app ∷ [])
+
+generate-body dec | 3 | / a - A / [∧] / b - B / =
+
+  let D&T coh1 coh1app = def-coh dec in
+  let D&T coh2 coh2app = base-coh dec L in
+  let D&T coh3 coh3app = glue-coh dec L in
+  let D&T coh4 coh4app = base-coh dec R in
+  let D&T coh5 coh5app = glue-coh dec R in
+
+  sprintf "%k\n\n%k\n\n%k\n\n%k\n\n%k
+
+%k : %k %k → %k
+%k %k =
+  Smash-elim (λ %k %k → %k)
+             (%k)
+             (λ %k → ↓-Cube-in (%k))
+             (%k)
+             (λ %k → ↓-Cube-in (%k))
 " (coh1 ∷ coh2 ∷ coh3 ∷ coh4 ∷ coh5
   ∷ name dec ∷ params dec ∷ get-arg dec ∷ type dec
   ∷ name dec ∷ onlyNames (params dec)
@@ -2690,6 +2793,7 @@ main : IO ⊤
 main =
   putStr ("{-# OPTIONS --without-K --rewriting #-}
 
+open import SmashCommon
 open import PathInduction
 open import SmashDefs
 
@@ -2701,15 +2805,15 @@ module dump {i : ULevel} where
 
     generate-body ∧-map-id-dec ++ "\n\n" ++
     generate-body σ-triangle-dec ++ "\n\n" ++
-    generate-body σ-2triangle-dec ++ "\n\n" ++
+    -- generate-body σ-2triangle-dec ++ "\n\n" ++
 
     generate-body α-dec ++ "\n\n" ++
     generate-body αinv-dec ++ "\n\n" ++
 
     -- generate-body β-dec ++ "\n\n" ++
-    -- generate-body γ-dec ++ "\n\n" ++
+    -- -- generate-body γ-dec ++ "\n\n" ++
 
-    -- generate-body σ-nat-dec ++ "\n\n" ++
+    -- -- generate-body σ-nat-dec ++ "\n\n" ++
 
     generate-body α-rinv-dec ++ "\n\n" ++
     generate-body α-linv-dec ++ "\n\n" ++
