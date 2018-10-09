@@ -1,7 +1,5 @@
 other
 MAlonzo
 SmashGenerate
-SmashGenerate.agdai
-Sprintf.agdai
 dump.agda
-dump.agdai
+*.agdai
